@@ -1,0 +1,132 @@
+# Quick Setup Checklist ✅
+
+## 1. Installation (5 minutes)
+
+```bash
+cd wp-content/plugins/ai-podcast-generator
+composer install
+```
+
+Then activate plugin in WordPress admin.
+
+## 2. Get API Keys (10 minutes)
+
+### OpenRouter (Required)
+- Visit: https://openrouter.ai/keys
+- Create account
+- Generate API key
+- Cost: Pay-as-you-go, ~$0.05-0.15 per script
+
+### OpenAI (Required)  
+- Visit: https://platform.openai.com/api-keys
+- Create account
+- Generate API key
+- Cost: ~$0.15-0.30 per 10-min podcast
+
+### Tavily (Optional)
+- Visit: https://tavily.com/
+- Create account
+- Generate API key
+- Cost: ~$0.01 per search (optional feature)
+
+## 3. Configure Plugin (2 minutes)
+
+Go to: **WordPress Admin > AI Podcasts > Settings**
+
+1. Paste OpenRouter API key
+2. Paste OpenAI API key
+3. Paste Tavily API key (optional)
+4. Save settings
+
+## 4. Generate First Podcast (1 minute)
+
+Go to: **WordPress Admin > AI Podcasts > Generate**
+
+**Quick Settings:**
+- Source Post: Select any article
+- Duration: 10 minutes
+- Language: English
+- Hosts: 2
+- Click "Generate Podcast"
+
+Wait 5-10 minutes, check dashboard for completion!
+
+## 5. Setup Automation (Optional)
+
+Go to: **WordPress Admin > AI Podcasts > Settings**
+
+1. Enable "Auto-Generation"
+2. Set frequency: "Every hour"
+3. Articles to review: 20
+4. Save settings
+
+Done! Plugin will now auto-generate podcasts.
+
+## Recommended Models
+
+### For Script Generation (OpenRouter)
+- **Best Quality**: `anthropic/claude-sonnet-4`
+- **Fast & Cheap**: `anthropic/claude-haiku-4`
+- **Alternative**: `openai/gpt-4o`
+
+### For Audio (OpenAI)
+- **Best Quality**: `tts-1-hd`
+- **Faster**: `tts-1`
+- **With Instructions**: `gpt-4o-mini-tts`
+
+## Suggested Voices
+
+**For 2 Hosts:**
+- Host 1: `echo` (male, professional)
+- Host 2: `nova` (female, energetic)
+
+**For 3 Hosts:**
+- Host 1: `onyx` (male, authoritative)
+- Host 2: `coral` (female, friendly)
+- Host 3: `sage` (female, calm)
+
+## Troubleshooting
+
+**Generation not starting?**
+- Check API keys are correct
+- Verify you have credits in APIs
+- Check Action Scheduler: Tools > Scheduled Actions
+
+**Audio not merging?**
+- Install FFmpeg on server
+- Or accept separate audio chunks
+
+**Taking too long?**
+- Normal for first run
+- 10-min podcast = 5-10 min generation
+- Check dashboard for progress
+
+## Cost Calculator
+
+For a **10-minute podcast**:
+- Script Generation: $0.10
+- Audio Generation: $0.20
+- Web Search: $0.03
+- **Total**: ~$0.33
+
+**Monthly Estimates:**
+- 1 podcast/day: ~$10/month
+- 5 podcasts/day: ~$50/month
+- 20 podcasts/day: ~$200/month
+
+## Next Steps
+
+1. Generate test podcast
+2. Customize player with Elementor
+3. Add custom intro/outro
+4. Enable automation
+5. Share podcasts on social media!
+
+## Need Help?
+
+- Check INSTALLATION.txt for detailed guide
+- Check PLUGIN-OVERVIEW.txt for full documentation
+- Review WordPress error logs
+- Contact: contact@sawahsolutions.com
+
+Enjoy your AI podcast generator! 🎙️🚀

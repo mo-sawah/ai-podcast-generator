@@ -1,0 +1,25 @@
+{
+    "name": "sawahsolutions/ai-podcast-generator",
+    "description": "AI-powered podcast generator for WordPress using OpenRouter and OpenAI TTS",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Mohamed Sawah",
+            "email": "contact@sawahsolutions.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.4",
+        "woocommerce/action-scheduler": "^3.7"
+    },
+    "autoload": {
+        "classmap": [
+            "includes/"
+        ]
+    },
+    "config": {
+        "vendor-dir": "vendor",
+        "optimize-autoloader": true
+    }
+}
