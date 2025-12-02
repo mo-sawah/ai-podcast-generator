@@ -19,16 +19,6 @@ define('AIPG_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AIPG_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('AIPG_PLUGIN_FILE', __FILE__);
 
-// Autoloader
-spl_autoload_register(function($class) {
-    if (strpos($class, 'AIPG_') !== 0) return;
-    
-    $file = AIPG_PLUGIN_DIR . 'includes/class-' . strtolower(str_replace('_', '-', $class)) . '.php';
-    if (file_exists($file)) {
-        require_once $file;
-    }
-});
-
 /**
  * Main Plugin Class
  */
@@ -45,21 +35,37 @@ class AI_Podcast_Generator {
     
     private function __construct() {
         $this->init_hooks();
-        $this->load_dependencies();
     }
     
     private function init_hooks() {
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
         
-        add_action('plugins_loaded', array($this, 'init'));
-        add_action('init', array($this, 'load_textdomain'));
+        add_action('plugins_loaded', array($this, 'init'), 20);
+    }
+    
+    public function init() {
+        // Check if Action Scheduler is available (from WooCommerce or standalone)
+        if (!function_exists('as_enqueue_async_action')) {
+            // Try to load from vendor if exists
+            $action_scheduler = AIPG_PLUGIN_DIR . 'vendor/woocommerce/action-scheduler/action-scheduler.php';
+            if (file_exists($action_scheduler)) {
+                require_once $action_scheduler;
+            } else {
+                // Show admin notice
+                add_action('admin_notices', array($this, 'action_scheduler_missing_notice'));
+                return;
+            }
+        }
+        
+        // Load dependencies
+        $this->load_dependencies();
+        
+        // Initialize components
+        $this->init_components();
     }
     
     private function load_dependencies() {
-        // Include Action Scheduler
-        require_once AIPG_PLUGIN_DIR . 'vendor/action-scheduler/action-scheduler.php';
-        
         // Core classes
         require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-database.php';
         require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-cpt.php';
@@ -72,8 +78,7 @@ class AI_Podcast_Generator {
         require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-player.php';
     }
     
-    public function init() {
-        // Initialize components
+    private function init_components() {
         AIPG_Database::instance();
         AIPG_CPT::instance();
         AIPG_Admin::instance();
@@ -82,11 +87,38 @@ class AI_Podcast_Generator {
         AIPG_Player::instance();
     }
     
+    public function action_scheduler_missing_notice() {
+        ?>
+        <div class="notice notice-error">
+            <p>
+                <strong><?php _e('AI Podcast Generator:', 'ai-podcast-gen'); ?></strong>
+                <?php _e('Action Scheduler is required. Please run "composer install" in the plugin directory:', 'ai-podcast-gen'); ?>
+                <code>cd <?php echo AIPG_PLUGIN_DIR; ?> && composer install</code>
+            </p>
+            <p>
+                <?php _e('Or install WooCommerce which includes Action Scheduler.', 'ai-podcast-gen'); ?>
+            </p>
+        </div>
+        <?php
+    }
+    
     public function load_textdomain() {
         load_plugin_textdomain('ai-podcast-gen', false, dirname(plugin_basename(__FILE__)) . '/languages');
     }
     
     public function activate() {
+        // Check for Action Scheduler
+        if (!function_exists('as_enqueue_async_action')) {
+            $action_scheduler = AIPG_PLUGIN_DIR . 'vendor/woocommerce/action-scheduler/action-scheduler.php';
+            if (file_exists($action_scheduler)) {
+                require_once $action_scheduler;
+            }
+        }
+        
+        // Load dependencies for activation
+        require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-database.php';
+        require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-cpt.php';
+        
         AIPG_Database::create_tables();
         AIPG_CPT::register_post_type();
         flush_rewrite_rules();
@@ -102,4 +134,5 @@ function aipg() {
     return AI_Podcast_Generator::instance();
 }
 
-aipg();
+// Start the plugin
+add_action('plugins_loaded', 'aipg', 10);

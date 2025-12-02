@@ -17,7 +17,7 @@ class AIPG_CPT {
     }
     
     private function __construct() {
-        add_action('init', array($this, 'register_post_type'));
+        add_action('init', array($this, 'register_post_type_hook'));
         add_action('add_meta_boxes', array($this, 'add_meta_boxes'));
         add_action('save_post_ai_podcast', array($this, 'save_meta_boxes'));
         add_filter('manage_ai_podcast_posts_columns', array($this, 'set_custom_columns'));
@@ -25,9 +25,16 @@ class AIPG_CPT {
     }
     
     /**
+     * Hook wrapper for register_post_type
+     */
+    public function register_post_type_hook() {
+        self::register_post_type();
+    }
+    
+    /**
      * Register podcast post type
      */
-    public function register_post_type() {
+    public static function register_post_type() {
         $labels = array(
             'name' => __('Podcasts', 'ai-podcast-gen'),
             'singular_name' => __('Podcast', 'ai-podcast-gen'),
