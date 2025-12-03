@@ -108,7 +108,7 @@ class AIPG_Generator {
             'outro_text' => sanitize_textarea_field($_POST['outro_text'] ?? ''),
             'voice_mapping' => $voice_mapping,
             'include_emotions' => isset($_POST['include_emotions']),
-            'model' => get_option('aipg_tts_model', 'gpt-4o-mini-tts'), // Use new GPT-4o Mini TTS by default
+            'model' => get_option('aipg_tts_model', 'tts-1'), // Default to tts-1 (works with all API keys)
             'speed' => 1.0,
         );
         

@@ -251,15 +251,11 @@ class AIPG_OpenAI_TTS {
     public function test_tts_access() {
         $results = array();
         
-        // Test gpt-4o-mini-tts (newest model with instructions support)
-        $test_text = "Testing GPT-4o Mini TTS.";
-        $results['gpt-4o-mini-tts'] = $this->test_model('gpt-4o-mini-tts', $test_text);
-        
-        // Test tts-1 (standard)
+        // Test tts-1 (standard) - WORKS WITH ALL KEYS
         $test_text = "Testing standard quality.";
         $results['tts-1'] = $this->test_model('tts-1', $test_text);
         
-        // Test tts-1-hd (HD quality)
+        // Test tts-1-hd (HD quality) - REQUIRES PAID ACCOUNT
         $test_text = "Testing HD quality.";
         $results['tts-1-hd'] = $this->test_model('tts-1-hd', $test_text);
         
@@ -317,64 +313,22 @@ class AIPG_OpenAI_TTS {
      */
     private function generate_single_audio($text, $voice, $settings) {
         // Get model from settings or use saved preference
-        $model = isset($settings['model']) ? strtolower($settings['model']) : get_option('aipg_tts_model', 'gpt-4o-mini-tts');
+        // DEFAULT TO tts-1 (works with all API keys)
+        $model = isset($settings['model']) ? strtolower($settings['model']) : get_option('aipg_tts_model', 'tts-1');
         
         // Map common model names to valid OpenAI models
+        // ONLY tts-1 and tts-1-hd work with regular OpenAI API!
         $model_map = array(
-            'gpt-4o-mini-tts' => 'gpt-4o-mini-tts',
-            'tts-1-hd' => 'tts-1-hd',
             'tts-1' => 'tts-1',
+            'tts-1-hd' => 'tts-1-hd',
             'hd' => 'tts-1-hd',
             'standard' => 'tts-1',
-            'mini' => 'gpt-4o-mini-tts',
         );
         
-        $model = isset($model_map[$model]) ? $model_map[$model] : 'gpt-4o-mini-tts';
+        $model = isset($model_map[$model]) ? $model_map[$model] : 'tts-1';
         
-        // Process text based on model capabilities
-        $instructions = null;
-        if ($model === 'gpt-4o-mini-tts') {
-            // New model: supports instructions parameter for emotion control!
-            $base_instructions = 'Speak in a natural, engaging manner for a podcast conversation';
-            
-            // Extract emotion tags and convert to instructions
-            $emotion_instructions = array();
-            if (stripos($text, '[excited]') !== false) {
-                $emotion_instructions[] = 'with excitement and energy';
-                $text = str_ireplace('[excited]', '', $text);
-            }
-            if (stripos($text, '[thoughtful]') !== false) {
-                $emotion_instructions[] = 'in a thoughtful, contemplative manner';
-                $text = str_ireplace('[thoughtful]', '', $text);
-            }
-            if (stripos($text, '[concerned]') !== false) {
-                $emotion_instructions[] = 'with concern and care';
-                $text = str_ireplace('[concerned]', '', $text);
-            }
-            if (stripos($text, '[happy]') !== false) {
-                $emotion_instructions[] = 'with happiness and joy';
-                $text = str_ireplace('[happy]', '', $text);
-            }
-            if (stripos($text, '[curious]') !== false) {
-                $emotion_instructions[] = 'with curiosity and interest';
-                $text = str_ireplace('[curious]', '', $text);
-            }
-            if (stripos($text, '[calm]') !== false) {
-                $emotion_instructions[] = 'in a calm, soothing manner';
-                $text = str_ireplace('[calm]', '', $text);
-            }
-            
-            if (!empty($emotion_instructions)) {
-                $instructions = $base_instructions . ' ' . implode(', ', $emotion_instructions) . '.';
-            } else {
-                $instructions = $base_instructions . '.';
-            }
-            
-            $text = trim($text);
-        } else {
-            // Old models: use punctuation for emotions (fallback)
-            $text = $this->process_emotion_tags($text);
-        }
+        // Process emotion tags (old method with punctuation since we don't have instructions parameter)
+        $text = $this->process_emotion_tags($text);
         
         $body = array(
             'model' => $model,
@@ -383,17 +337,12 @@ class AIPG_OpenAI_TTS {
             'response_format' => 'mp3',
         );
         
-        // Add instructions for gpt-4o-mini-tts
-        if ($model === 'gpt-4o-mini-tts' && !empty($instructions)) {
-            $body['instructions'] = $instructions;
-        }
-        
         // Only add speed if not default
         if (isset($settings['speed']) && $settings['speed'] != 1.0) {
             $body['speed'] = floatval($settings['speed']);
         }
         
-        error_log("AIPG TTS: Generating audio with model={$model}, voice={$voice}, text_length=" . strlen($text) . ($instructions ? ", instructions={$instructions}" : ""));
+        error_log("AIPG TTS: Generating audio with model={$model}, voice={$voice}, text_length=" . strlen($text));
         
         $response = wp_remote_post($this->base_url, array(
             'headers' => array(
@@ -420,22 +369,22 @@ class AIPG_OpenAI_TTS {
             error_log("AIPG TTS Error Details: {$body_content}");
             
             // Provide helpful error messages based on model
-            if ($model === 'gpt-4o-mini-tts' && (strpos($error_message, 'model') !== false || strpos($error_message, 'access') !== false)) {
-                $helpful_message = "GPT-4o Mini TTS requires API access. ";
-                $helpful_message .= "This is OpenAI's newest TTS model. ";
-                $helpful_message .= "Try using Standard Quality (tts-1) in Settings if this doesn't work. ";
-                $helpful_message .= "Original error: {$error_message}";
-                
-                return new WP_Error('tts_model_access', $helpful_message);
-            }
-            
-            if ($model === 'tts-1-hd' && (strpos($error_message, 'model') !== false || strpos($error_message, 'access') !== false)) {
-                $helpful_message = "HD Quality (tts-1-hd) requires a paid OpenAI account. ";
+            if ($model === 'tts-1-hd' && (strpos($error_message, 'model') !== false || strpos($error_message, 'access') !== false || strpos($error_message, 'valid') !== false)) {
+                $helpful_message = "HD Quality (tts-1-hd) requires a paid OpenAI account with billing enabled. ";
                 $helpful_message .= "Please add a payment method at https://platform.openai.com/account/billing/overview ";
-                $helpful_message .= "or switch to GPT-4o Mini TTS or Standard Quality (tts-1) in Settings. ";
+                $helpful_message .= "or switch to Standard Quality (tts-1) in Settings. ";
                 $helpful_message .= "Original error: {$error_message}";
                 
                 return new WP_Error('tts_hd_access', $helpful_message);
+            }
+            
+            // For any TTS error, provide helpful context
+            if (strpos($error_message, 'Incorrect API key') !== false || strpos($error_message, 'authentication') !== false) {
+                $helpful_message = "OpenAI API key is invalid. Please check your API key in Settings. ";
+                $helpful_message .= "Get your key from: https://platform.openai.com/api-keys ";
+                $helpful_message .= "Original error: {$error_message}";
+                
+                return new WP_Error('tts_auth_error', $helpful_message);
             }
             
             return new WP_Error('tts_error', $error_message);

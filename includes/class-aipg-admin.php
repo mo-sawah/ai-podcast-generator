@@ -702,24 +702,23 @@ class AIPG_Admin {
                             </th>
                             <td>
                                 <select id="aipg_tts_model" name="aipg_tts_model" class="regular-text">
-                                    <option value="gpt-4o-mini-tts" <?php selected(get_option('aipg_tts_model', 'gpt-4o-mini-tts'), 'gpt-4o-mini-tts'); ?>>
-                                        <?php _e('🚀 GPT-4o Mini TTS - Newest! Supports emotion instructions', 'ai-podcast-gen'); ?>
+                                    <option value="tts-1" <?php selected(get_option('aipg_tts_model', 'tts-1'), 'tts-1'); ?>>
+                                        <?php _e('🔊 Standard Quality (tts-1) - Good quality, works with all API keys', 'ai-podcast-gen'); ?>
                                     </option>
-                                    <option value="tts-1-hd" <?php selected(get_option('aipg_tts_model', 'gpt-4o-mini-tts'), 'tts-1-hd'); ?>>
+                                    <option value="tts-1-hd" <?php selected(get_option('aipg_tts_model', 'tts-1'), 'tts-1-hd'); ?>>
                                         <?php _e('🎵 HD Quality (tts-1-hd) - Best quality, requires paid account', 'ai-podcast-gen'); ?>
-                                    </option>
-                                    <option value="tts-1" <?php selected(get_option('aipg_tts_model', 'gpt-4o-mini-tts'), 'tts-1'); ?>>
-                                        <?php _e('🔊 Standard Quality (tts-1) - Good quality, faster', 'ai-podcast-gen'); ?>
                                     </option>
                                 </select>
                                 <p class="description">
-                                    <strong><?php _e('🚀 NEW: GPT-4o Mini TTS', 'ai-podcast-gen'); ?></strong><br>
-                                    • <?php _e('OpenAI\'s newest and most reliable TTS model', 'ai-podcast-gen'); ?><br>
-                                    • <?php _e('Supports emotion instructions for better delivery', 'ai-podcast-gen'); ?><br>
-                                    • <?php _e('Works with [excited], [thoughtful], [calm] emotion tags', 'ai-podcast-gen'); ?><br>
+                                    <strong><?php _e('Standard Quality (tts-1):', 'ai-podcast-gen'); ?></strong><br>
+                                    • <?php _e('Works with ALL OpenAI API keys (free & paid)', 'ai-podcast-gen'); ?><br>
+                                    • <?php _e('Good audio quality, fast generation', 'ai-podcast-gen'); ?><br>
+                                    • <?php _e('Cost: $0.015 per 1K characters (~$0.15-0.25 per 10min podcast)', 'ai-podcast-gen'); ?><br>
                                     <br>
-                                    <strong><?php _e('HD Quality requires:', 'ai-podcast-gen'); ?></strong><br>
-                                    • <?php _e('Paid OpenAI account with billing enabled', 'ai-podcast-gen'); ?><br>
+                                    <strong><?php _e('HD Quality (tts-1-hd):', 'ai-podcast-gen'); ?></strong><br>
+                                    • <?php _e('REQUIRES paid OpenAI account with billing', 'ai-podcast-gen'); ?><br>
+                                    • <?php _e('Noticeably better audio quality', 'ai-podcast-gen'); ?><br>
+                                    • <?php _e('Cost: $0.030 per 1K characters (2x standard)', 'ai-podcast-gen'); ?><br>
                                     • <?php _e('Add payment at:', 'ai-podcast-gen'); ?> 
                                     <a href="https://platform.openai.com/account/billing/overview" target="_blank">platform.openai.com/account/billing</a>
                                 </p>

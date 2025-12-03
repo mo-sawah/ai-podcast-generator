@@ -20,7 +20,7 @@
           '<span class="dashicons dashicons-update aipg-spin"></span> Testing...'
         );
       $results.html(
-        '<p style="color: #666;"><em>Testing all TTS models...</em></p>'
+        '<p style="color: #666;"><em>Testing TTS models...</em></p>'
       );
 
       $.ajax({
@@ -36,43 +36,31 @@
               '<div class="aipg-tts-test-results" style="border-left: 4px solid #7d5fff; padding-left: 15px; margin-top: 10px;">';
             const results = response.data.results;
 
-            // Test gpt-4o-mini-tts (NEW!)
-            if (results["gpt-4o-mini-tts"]) {
-              const test = results["gpt-4o-mini-tts"];
-              if (test.success) {
-                html +=
-                  '<p style="color: #28a745; margin: 8px 0; font-weight: 500;"><strong>✅ GPT-4o Mini TTS (NEW!):</strong> ' +
-                  test.message +
-                  "</p>";
-                html +=
-                  '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>🚀 This is the newest model with emotion instructions support!</em></p>';
-              } else {
-                html +=
-                  '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ GPT-4o Mini TTS:</strong> ' +
-                  test.error +
-                  "</p>";
-                html +=
-                  '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><small>Try using Standard Quality (tts-1) instead.</small></p>';
-              }
-            }
-
-            // Test tts-1 (Standard)
+            // Test tts-1 (Standard) - Should work for everyone
             if (results["tts-1"]) {
               const test = results["tts-1"];
               if (test.success) {
                 html +=
-                  '<p style="color: #28a745; margin: 8px 0;"><strong>✅ Standard Quality (tts-1):</strong> ' +
+                  '<p style="color: #28a745; margin: 8px 0; font-weight: 500;"><strong>✅ Standard Quality (tts-1):</strong> ' +
                   test.message +
                   "</p>";
+                html +=
+                  '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>✓ Works with ALL API keys! You can use this model.</em></p>';
               } else {
                 html +=
                   '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ Standard Quality (tts-1):</strong> ' +
                   test.error +
                   "</p>";
+                html +=
+                  '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><strong>⚠️ Problem:</strong> Your API key cannot access TTS at all. Please check:<br>';
+                html += "1. Make sure you have a valid OpenAI API key<br>";
+                html +=
+                  '2. Get a new key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a><br>';
+                html += "3. Make sure TTS is enabled for your account</p>";
               }
             }
 
-            // Test tts-1-hd (HD)
+            // Test tts-1-hd (HD) - Requires payment
             if (results["tts-1-hd"]) {
               const test = results["tts-1-hd"];
               if (test.success) {
@@ -101,6 +89,9 @@
                   html += "4. Test again!<br>";
                   html +=
                     "<small>Cost: HD is $0.030 per 1K characters (2x standard)</small></p>";
+                } else {
+                  html +=
+                    '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>Note: You can still use Standard Quality (tts-1) above.</em></p>';
                 }
               }
             }
@@ -115,7 +106,7 @@
         },
         error: function () {
           $results.html(
-            '<p style="color: #dc3545;">❌ Test failed. Please check your OpenAI API key.</p>'
+            '<p style="color: #dc3545;">❌ Test failed. Please check your OpenAI API key in Settings.</p>'
           );
         },
         complete: function () {
