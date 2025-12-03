@@ -9,10 +9,26 @@
   let currentAudio = null;
 
   $(document).ready(function () {
+    // TTS Provider Switcher
+    $("#aipg_tts_provider").on("change", function () {
+      const provider = $(this).val();
+
+      // Hide all provider settings
+      $(".aipg-provider-settings").hide();
+
+      // Show selected provider settings
+      if (provider === "elevenlabs") {
+        $(".aipg-elevenlabs-settings").show();
+      } else {
+        $(".aipg-openai-settings").show();
+      }
+    });
+
     // TTS Model Test Button
     $("#aipg-test-tts").on("click", function () {
       const $btn = $(this);
       const $results = $("#aipg-tts-test-results");
+      const provider = $("#aipg_tts_provider").val() || "openai";
 
       $btn
         .prop("disabled", true)
@@ -20,7 +36,9 @@
           '<span class="dashicons dashicons-update aipg-spin"></span> Testing...'
         );
       $results.html(
-        '<p style="color: #666;"><em>Testing TTS models...</em></p>'
+        '<p style="color: #666;"><em>Testing ' +
+          (provider === "elevenlabs" ? "ElevenLabs" : "OpenAI") +
+          " TTS...</em></p>"
       );
 
       $.ajax({
@@ -32,72 +50,92 @@
         },
         success: function (response) {
           if (response.success) {
-            let html =
-              '<div class="aipg-tts-test-results" style="border-left: 4px solid #7d5fff; padding-left: 15px; margin-top: 10px;">';
+            const provider = response.data.provider;
             const results = response.data.results;
 
-            // Test tts-1 (Standard) - Should work for everyone
-            if (results["tts-1"]) {
-              const test = results["tts-1"];
-              if (test.success) {
-                html +=
-                  '<p style="color: #28a745; margin: 8px 0; font-weight: 500;"><strong>✅ Standard Quality (tts-1):</strong> ' +
-                  test.message +
-                  "</p>";
-                html +=
-                  '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>✓ Works with ALL API keys! You can use this model.</em></p>';
-              } else {
-                html +=
-                  '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ Standard Quality (tts-1):</strong> ' +
-                  test.error +
-                  "</p>";
-                html +=
-                  '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><strong>⚠️ Problem:</strong> Your API key cannot access TTS at all. Please check:<br>';
-                html += "1. Make sure you have a valid OpenAI API key<br>";
-                html +=
-                  '2. Get a new key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a><br>';
-                html += "3. Make sure TTS is enabled for your account</p>";
-              }
-            }
+            if (provider === "elevenlabs") {
+              // ElevenLabs test results
+              let html =
+                '<div class="aipg-tts-test-results" style="border-left: 4px solid #7d5fff; padding-left: 15px; margin-top: 10px;">';
 
-            // Test tts-1-hd (HD) - Requires payment
-            if (results["tts-1-hd"]) {
-              const test = results["tts-1-hd"];
-              if (test.success) {
+              if (results[0].success) {
                 html +=
-                  '<p style="color: #28a745; margin: 8px 0;"><strong>✅ HD Quality (tts-1-hd):</strong> ' +
-                  test.message +
+                  '<p style="color: #28a745; margin: 8px 0; font-weight: 500;"><strong>✅ ElevenLabs API:</strong> ' +
+                  results[0].message +
                   "</p>";
                 html +=
-                  '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>💎 HD quality is available! 2x cost but noticeably better audio.</em></p>';
+                  '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>✓ Connected successfully! Model: ' +
+                  results[0].model +
+                  "</em></p>";
               } else {
                 html +=
-                  '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ HD Quality (tts-1-hd):</strong> ' +
-                  test.error +
+                  '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ ElevenLabs API:</strong> ' +
+                  results[0].message +
                   "</p>";
-                if (
-                  test.error.includes("model") ||
-                  test.error.includes("access") ||
-                  test.error.includes("valid")
-                ) {
+                html +=
+                  '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><strong>⚠️ Problem:</strong><br>';
+                html += "1. Check your ElevenLabs API key<br>";
+                html +=
+                  '2. Get a new key at <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">elevenlabs.io/app/settings/api-keys</a><br>';
+                html += "3. Make sure you have credits in your account</p>";
+              }
+
+              html += "</div>";
+              $results.html(html);
+            } else {
+              // OpenAI test results
+              let html =
+                '<div class="aipg-tts-test-results" style="border-left: 4px solid #7d5fff; padding-left: 15px; margin-top: 10px;">';
+
+              // Test tts-1 (Standard)
+              if (results["tts-1"]) {
+                const test = results["tts-1"];
+                if (test.success) {
                   html +=
-                    '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><strong>💡 To enable HD quality:</strong><br>';
+                    '<p style="color: #28a745; margin: 8px 0; font-weight: 500;"><strong>✅ Standard Quality (tts-1):</strong> ' +
+                    test.message +
+                    "</p>";
                   html +=
-                    '1. Go to <a href="https://platform.openai.com/account/billing/overview" target="_blank">OpenAI Billing</a><br>';
-                  html += "2. Add a payment method<br>";
-                  html += "3. Add at least $10 credit<br>";
-                  html += "4. Test again!<br>";
-                  html +=
-                    "<small>Cost: HD is $0.030 per 1K characters (2x standard)</small></p>";
+                    '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>✓ Works with ALL API keys!</em></p>';
                 } else {
                   html +=
-                    '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>Note: You can still use Standard Quality (tts-1) above.</em></p>';
+                    '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ Standard Quality (tts-1):</strong> ' +
+                    test.error +
+                    "</p>";
+                  html +=
+                    '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><strong>⚠️ Problem:</strong><br>';
+                  html += "1. Check your OpenAI API key<br>";
+                  html +=
+                    '2. Get a new key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></p>';
                 }
               }
-            }
 
-            html += "</div>";
-            $results.html(html);
+              // Test tts-1-hd (HD)
+              if (results["tts-1-hd"]) {
+                const test = results["tts-1-hd"];
+                if (test.success) {
+                  html +=
+                    '<p style="color: #28a745; margin: 8px 0;"><strong>✅ HD Quality (tts-1-hd):</strong> ' +
+                    test.message +
+                    "</p>";
+                  html +=
+                    '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>💎 HD quality available!</em></p>';
+                } else {
+                  html +=
+                    '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ HD Quality (tts-1-hd):</strong> ' +
+                    test.error +
+                    "</p>";
+                  html +=
+                    '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><strong>💡 To enable HD:</strong><br>';
+                  html +=
+                    '1. Go to <a href="https://platform.openai.com/account/billing/overview" target="_blank">OpenAI Billing</a><br>';
+                  html += "2. Add payment method and credits</p>";
+                }
+              }
+
+              html += "</div>";
+              $results.html(html);
+            }
           } else {
             $results.html(
               '<p style="color: #dc3545;">' + response.data.message + "</p>"
@@ -106,14 +144,14 @@
         },
         error: function () {
           $results.html(
-            '<p style="color: #dc3545;">❌ Test failed. Please check your OpenAI API key in Settings.</p>'
+            '<p style="color: #dc3545;">❌ Test failed. Please check your API key.</p>'
           );
         },
         complete: function () {
           $btn
             .prop("disabled", false)
             .html(
-              '<span class="dashicons dashicons-admin-tools"></span> Test TTS Models'
+              '<span class="dashicons dashicons-admin-tools"></span> Test TTS Provider'
             );
         },
       });

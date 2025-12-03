@@ -110,7 +110,13 @@ class AIPG_Admin {
         // API Keys
         register_setting('aipg_settings', 'aipg_openrouter_key');
         register_setting('aipg_settings', 'aipg_openai_key');
+        register_setting('aipg_settings', 'aipg_elevenlabs_key');
         register_setting('aipg_settings', 'aipg_tavily_key');
+        
+        // TTS Provider Settings
+        register_setting('aipg_settings', 'aipg_tts_provider');
+        register_setting('aipg_settings', 'aipg_tts_model');
+        register_setting('aipg_settings', 'aipg_elevenlabs_model');
         
         // Player Settings
         register_setting('aipg_settings', 'aipg_player_theme');
@@ -135,6 +141,75 @@ class AIPG_Admin {
      * Get available voices
      */
     private function get_available_voices() {
+        $provider = get_option('aipg_tts_provider', 'openai');
+        
+        if ($provider === 'elevenlabs') {
+            // ElevenLabs voices
+            return array(
+                '21m00Tcm4TlvDq8ikWAM' => array(
+                    'name' => 'Rachel',
+                    'description' => 'Female, Professional',
+                    'gender' => 'female',
+                ),
+                'AZnzlk1XvdvUeBnXmlld' => array(
+                    'name' => 'Domi',
+                    'description' => 'Female, Energetic',
+                    'gender' => 'female',
+                ),
+                'EXAVITQu4vr4xnSDxMaL' => array(
+                    'name' => 'Bella',
+                    'description' => 'Female, Soft',
+                    'gender' => 'female',
+                ),
+                'ErXwobaYiN019PkySvjV' => array(
+                    'name' => 'Antoni',
+                    'description' => 'Male, Balanced',
+                    'gender' => 'male',
+                ),
+                'VR6AewLTigWG4xSOukaG' => array(
+                    'name' => 'Arnold',
+                    'description' => 'Male, Authoritative',
+                    'gender' => 'male',
+                ),
+                'pNInz6obpgDQGcFmaJgB' => array(
+                    'name' => 'Adam',
+                    'description' => 'Male, Professional',
+                    'gender' => 'male',
+                ),
+                'yoZ06aMxZJJ28mfd3POQ' => array(
+                    'name' => 'Sam',
+                    'description' => 'Male, Conversational',
+                    'gender' => 'male',
+                ),
+                'MF3mGyEYCl7XYWbV9V6O' => array(
+                    'name' => 'Elli',
+                    'description' => 'Female, Young',
+                    'gender' => 'female',
+                ),
+                'TxGEqnHWrfWFTfGW9XjX' => array(
+                    'name' => 'Josh',
+                    'description' => 'Male, Expressive',
+                    'gender' => 'male',
+                ),
+                'IKne3meq5aSn9XLyUdCD' => array(
+                    'name' => 'Charlie',
+                    'description' => 'Male, Casual',
+                    'gender' => 'male',
+                ),
+                'onwK4e9ZLuTAKqWW03F9' => array(
+                    'name' => 'Daniel',
+                    'description' => 'Male, Deep',
+                    'gender' => 'male',
+                ),
+                'JBFqnCBsd6RMkjVDRZzb' => array(
+                    'name' => 'George',
+                    'description' => 'Male, British',
+                    'gender' => 'male',
+                ),
+            );
+        }
+        
+        // OpenAI voices (default)
         return array(
             'alloy' => array(
                 'name' => 'Alloy',
@@ -613,8 +688,11 @@ class AIPG_Admin {
         if (isset($_POST['aipg_save_settings']) && wp_verify_nonce($_POST['_wpnonce'], 'aipg_settings')) {
             update_option('aipg_openrouter_key', sanitize_text_field($_POST['aipg_openrouter_key']));
             update_option('aipg_openai_key', sanitize_text_field($_POST['aipg_openai_key']));
+            update_option('aipg_elevenlabs_key', sanitize_text_field($_POST['aipg_elevenlabs_key']));
             update_option('aipg_tavily_key', sanitize_text_field($_POST['aipg_tavily_key']));
+            update_option('aipg_tts_provider', sanitize_text_field($_POST['aipg_tts_provider']));
             update_option('aipg_tts_model', sanitize_text_field($_POST['aipg_tts_model']));
+            update_option('aipg_elevenlabs_model', sanitize_text_field($_POST['aipg_elevenlabs_model']));
             update_option('aipg_player_theme', sanitize_text_field($_POST['aipg_player_theme']));
             update_option('aipg_enable_search', isset($_POST['aipg_enable_search']));
             update_option('aipg_enable_emotions', isset($_POST['aipg_enable_emotions']));
@@ -665,10 +743,25 @@ class AIPG_Admin {
                             <td>
                                 <input type="password" id="aipg_openai_key" name="aipg_openai_key" 
                                        value="<?php echo esc_attr(get_option('aipg_openai_key')); ?>" 
-                                       class="regular-text" required>
+                                       class="regular-text">
                                 <p class="description">
-                                    <?php _e('Required for text-to-speech. Get your key from', 'ai-podcast-gen'); ?>
+                                    <?php _e('For OpenAI TTS. Get your key from', 'ai-podcast-gen'); ?>
                                     <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI</a>
+                                </p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row">
+                                <label for="aipg_elevenlabs_key"><?php _e('ElevenLabs API Key', 'ai-podcast-gen'); ?></label>
+                            </th>
+                            <td>
+                                <input type="password" id="aipg_elevenlabs_key" name="aipg_elevenlabs_key" 
+                                       value="<?php echo esc_attr(get_option('aipg_elevenlabs_key')); ?>" 
+                                       class="regular-text">
+                                <p class="description">
+                                    <?php _e('For ElevenLabs TTS. Get your key from', 'ai-podcast-gen'); ?>
+                                    <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">ElevenLabs</a>
                                 </p>
                             </td>
                         </tr>
@@ -690,37 +783,81 @@ class AIPG_Admin {
                     </table>
                 </div>
                 
-                <!-- TTS Quality Settings -->
+                <!-- TTS Provider & Quality Settings -->
                 <div class="aipg-card">
-                    <h2><?php _e('TTS Quality Settings', 'ai-podcast-gen'); ?></h2>
-                    <p class="aipg-form-help"><?php _e('Choose audio quality and test API access', 'ai-podcast-gen'); ?></p>
+                    <h2><?php _e('TTS Provider & Quality Settings', 'ai-podcast-gen'); ?></h2>
+                    <p class="aipg-form-help"><?php _e('Choose your TTS provider and quality settings', 'ai-podcast-gen'); ?></p>
                     
                     <table class="form-table">
                         <tr>
                             <th scope="row">
-                                <label for="aipg_tts_model"><?php _e('Audio Quality', 'ai-podcast-gen'); ?></label>
+                                <label for="aipg_tts_provider"><?php _e('TTS Provider', 'ai-podcast-gen'); ?></label>
+                            </th>
+                            <td>
+                                <select id="aipg_tts_provider" name="aipg_tts_provider" class="regular-text">
+                                    <option value="openai" <?php selected(get_option('aipg_tts_provider', 'openai'), 'openai'); ?>>
+                                        <?php _e('OpenAI TTS', 'ai-podcast-gen'); ?>
+                                    </option>
+                                    <option value="elevenlabs" <?php selected(get_option('aipg_tts_provider', 'openai'), 'elevenlabs'); ?>>
+                                        <?php _e('ElevenLabs TTS', 'ai-podcast-gen'); ?>
+                                    </option>
+                                </select>
+                                <p class="description">
+                                    <?php _e('Choose which text-to-speech provider to use for podcast generation', 'ai-podcast-gen'); ?>
+                                </p>
+                            </td>
+                        </tr>
+                        
+                        <!-- OpenAI Settings -->
+                        <tr class="aipg-provider-settings aipg-openai-settings" style="<?php echo get_option('aipg_tts_provider', 'openai') === 'openai' ? '' : 'display:none;'; ?>">
+                            <th scope="row">
+                                <label for="aipg_tts_model"><?php _e('OpenAI Model', 'ai-podcast-gen'); ?></label>
                             </th>
                             <td>
                                 <select id="aipg_tts_model" name="aipg_tts_model" class="regular-text">
                                     <option value="tts-1" <?php selected(get_option('aipg_tts_model', 'tts-1'), 'tts-1'); ?>>
-                                        <?php _e('🔊 Standard Quality (tts-1) - Good quality, works with all API keys', 'ai-podcast-gen'); ?>
+                                        <?php _e('🔊 Standard Quality (tts-1)', 'ai-podcast-gen'); ?>
                                     </option>
                                     <option value="tts-1-hd" <?php selected(get_option('aipg_tts_model', 'tts-1'), 'tts-1-hd'); ?>>
-                                        <?php _e('🎵 HD Quality (tts-1-hd) - Best quality, requires paid account', 'ai-podcast-gen'); ?>
+                                        <?php _e('🎵 HD Quality (tts-1-hd)', 'ai-podcast-gen'); ?>
                                     </option>
                                 </select>
                                 <p class="description">
-                                    <strong><?php _e('Standard Quality (tts-1):', 'ai-podcast-gen'); ?></strong><br>
-                                    • <?php _e('Works with ALL OpenAI API keys (free & paid)', 'ai-podcast-gen'); ?><br>
-                                    • <?php _e('Good audio quality, fast generation', 'ai-podcast-gen'); ?><br>
-                                    • <?php _e('Cost: $0.015 per 1K characters (~$0.15-0.25 per 10min podcast)', 'ai-podcast-gen'); ?><br>
-                                    <br>
-                                    <strong><?php _e('HD Quality (tts-1-hd):', 'ai-podcast-gen'); ?></strong><br>
-                                    • <?php _e('REQUIRES paid OpenAI account with billing', 'ai-podcast-gen'); ?><br>
-                                    • <?php _e('Noticeably better audio quality', 'ai-podcast-gen'); ?><br>
-                                    • <?php _e('Cost: $0.030 per 1K characters (2x standard)', 'ai-podcast-gen'); ?><br>
-                                    • <?php _e('Add payment at:', 'ai-podcast-gen'); ?> 
-                                    <a href="https://platform.openai.com/account/billing/overview" target="_blank">platform.openai.com/account/billing</a>
+                                    <strong><?php _e('Standard (tts-1):', 'ai-podcast-gen'); ?></strong>
+                                    <?php _e('$0.015/1K chars, works with all API keys', 'ai-podcast-gen'); ?><br>
+                                    <strong><?php _e('HD (tts-1-hd):', 'ai-podcast-gen'); ?></strong>
+                                    <?php _e('$0.030/1K chars, requires paid account with billing', 'ai-podcast-gen'); ?>
+                                </p>
+                            </td>
+                        </tr>
+                        
+                        <!-- ElevenLabs Settings -->
+                        <tr class="aipg-provider-settings aipg-elevenlabs-settings" style="<?php echo get_option('aipg_tts_provider', 'openai') === 'elevenlabs' ? '' : 'display:none;'; ?>">
+                            <th scope="row">
+                                <label for="aipg_elevenlabs_model"><?php _e('ElevenLabs Model', 'ai-podcast-gen'); ?></label>
+                            </th>
+                            <td>
+                                <select id="aipg_elevenlabs_model" name="aipg_elevenlabs_model" class="regular-text">
+                                    <option value="eleven_flash_v2_5" <?php selected(get_option('aipg_elevenlabs_model', 'eleven_flash_v2_5'), 'eleven_flash_v2_5'); ?>>
+                                        <?php _e('⚡ Flash v2.5 - Fastest (75ms latency)', 'ai-podcast-gen'); ?>
+                                    </option>
+                                    <option value="eleven_turbo_v2_5" <?php selected(get_option('aipg_elevenlabs_model', 'eleven_flash_v2_5'), 'eleven_turbo_v2_5'); ?>>
+                                        <?php _e('🚀 Turbo v2.5 - Balanced', 'ai-podcast-gen'); ?>
+                                    </option>
+                                    <option value="eleven_v3" <?php selected(get_option('aipg_elevenlabs_model', 'eleven_flash_v2_5'), 'eleven_v3'); ?>>
+                                        <?php _e('⭐ Eleven v3 - Highest Quality', 'ai-podcast-gen'); ?>
+                                    </option>
+                                    <option value="eleven_multilingual_v2" <?php selected(get_option('aipg_elevenlabs_model', 'eleven_flash_v2_5'), 'eleven_multilingual_v2'); ?>>
+                                        <?php _e('🌐 Multilingual v2 - 32 Languages', 'ai-podcast-gen'); ?>
+                                    </option>
+                                </select>
+                                <p class="description">
+                                    <strong><?php _e('Flash v2.5:', 'ai-podcast-gen'); ?></strong>
+                                    <?php _e('$0.10/1K chars, ultra-fast', 'ai-podcast-gen'); ?><br>
+                                    <strong><?php _e('Turbo v2.5:', 'ai-podcast-gen'); ?></strong>
+                                    <?php _e('$0.20/1K chars, balanced', 'ai-podcast-gen'); ?><br>
+                                    <strong><?php _e('Eleven v3:', 'ai-podcast-gen'); ?></strong>
+                                    <?php _e('$0.30/1K chars, highest emotional range', 'ai-podcast-gen'); ?>
                                 </p>
                             </td>
                         </tr>
@@ -730,11 +867,11 @@ class AIPG_Admin {
                             <td>
                                 <button type="button" id="aipg-test-tts" class="button button-secondary">
                                     <span class="dashicons dashicons-admin-tools"></span>
-                                    <?php _e('Test TTS Models', 'ai-podcast-gen'); ?>
+                                    <?php _e('Test TTS Provider', 'ai-podcast-gen'); ?>
                                 </button>
                                 <div id="aipg-tts-test-results" style="margin-top: 15px;"></div>
                                 <p class="description">
-                                    <?php _e('Click to verify which TTS models your API key has access to', 'ai-podcast-gen'); ?>
+                                    <?php _e('Click to verify your TTS provider API access', 'ai-podcast-gen'); ?>
                                 </p>
                             </td>
                         </tr>
@@ -988,21 +1125,45 @@ class AIPG_Admin {
     public function ajax_test_tts_access() {
         check_ajax_referer('aipg_test_tts', 'nonce');
         
-        $openai_key = get_option('aipg_openai_key');
+        $provider = get_option('aipg_tts_provider', 'openai');
         
-        if (empty($openai_key)) {
-            wp_send_json_error(array(
-                'message' => __('OpenAI API key not configured. Please add your key first.', 'ai-podcast-gen')
+        if ($provider === 'elevenlabs') {
+            $api_key = get_option('aipg_elevenlabs_key');
+            
+            if (empty($api_key)) {
+                wp_send_json_error(array(
+                    'message' => __('ElevenLabs API key not configured. Please add your key first.', 'ai-podcast-gen')
+                ));
+            }
+            
+            require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-elevenlabs-tts.php';
+            $tts = new AIPG_ElevenLabs_TTS();
+            
+            $result = $tts->test_api_access();
+            
+            wp_send_json_success(array(
+                'provider' => 'elevenlabs',
+                'results' => array($result)
+            ));
+        } else {
+            // OpenAI
+            $api_key = get_option('aipg_openai_key');
+            
+            if (empty($api_key)) {
+                wp_send_json_error(array(
+                    'message' => __('OpenAI API key not configured. Please add your key first.', 'ai-podcast-gen')
+                ));
+            }
+            
+            require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-openai-tts.php';
+            $tts = new AIPG_OpenAI_TTS($api_key);
+            
+            $results = $tts->test_tts_access();
+            
+            wp_send_json_success(array(
+                'provider' => 'openai',
+                'results' => $results
             ));
         }
-        
-        require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-openai-tts.php';
-        $tts = new AIPG_OpenAI_TTS($openai_key);
-        
-        $results = $tts->test_tts_access();
-        
-        wp_send_json_success(array(
-            'results' => $results
-        ));
     }
 }

@@ -236,7 +236,25 @@ class AIPG_Generator {
             // Step 3: Generate audio
             AIPG_Database::update_generation($generation_id, array('status' => 'generating_audio'));
             
-            $tts = new AIPG_OpenAI_TTS();
+            // Get TTS provider
+            $provider = get_option('aipg_tts_provider', 'openai');
+            
+            if ($provider === 'elevenlabs') {
+                require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-elevenlabs-tts.php';
+                $tts = new AIPG_ElevenLabs_TTS();
+                
+                // Map OpenAI voices to ElevenLabs voices if needed
+                if (isset($settings['voice_mapping'])) {
+                    $mapped_voices = array();
+                    foreach ($settings['voice_mapping'] as $speaker => $voice) {
+                        $mapped_voices[$speaker] = $tts->map_openai_voice($voice);
+                    }
+                    $settings['voice_mapping'] = $mapped_voices;
+                }
+            } else {
+                $tts = new AIPG_OpenAI_TTS();
+            }
+            
             $audio_chunks = $tts->generate_podcast_audio($script_result, $settings);
             
             if (is_wp_error($audio_chunks)) {
