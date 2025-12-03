@@ -1,6 +1,6 @@
 <?php
 /**
- * Modern Audio Player
+ * Horizon Glass Podcast Player with Light/Dark Mode
  */
 
 if (!defined('ABSPATH')) exit;
@@ -30,8 +30,23 @@ class AIPG_Player {
             return;
         }
         
-        wp_enqueue_style('aipg-player', AIPG_PLUGIN_URL . 'assets/css/player.css', array(), AIPG_VERSION);
-        wp_enqueue_script('aipg-player', AIPG_PLUGIN_URL . 'assets/js/player.js', array('jquery'), AIPG_VERSION, true);
+        wp_enqueue_style('aipg-player-horizon', 
+            AIPG_PLUGIN_URL . 'assets/css/player-horizon.css', 
+            array(), 
+            AIPG_VERSION
+        );
+        
+        wp_enqueue_script('aipg-player-horizon', 
+            AIPG_PLUGIN_URL . 'assets/js/player-horizon.js', 
+            array('jquery'), 
+            AIPG_VERSION, 
+            true
+        );
+        
+        // Pass player theme setting
+        wp_localize_script('aipg-player-horizon', 'aipgPlayer', array(
+            'theme' => get_option('aipg_player_theme', 'dark'),
+        ));
     }
     
     /**
@@ -48,7 +63,7 @@ class AIPG_Player {
     public function player_shortcode($atts) {
         $atts = shortcode_atts(array(
             'id' => get_the_ID(),
-            'theme' => 'modern', // modern, minimal, classic
+            'theme' => get_option('aipg_player_theme', 'dark'),
         ), $atts);
         
         $post_id = intval($atts['id']);
@@ -60,15 +75,17 @@ class AIPG_Player {
         
         $title = get_the_title($post_id);
         $duration = get_post_meta($post_id, '_aipg_duration', true);
+        $episode_num = get_post_meta($post_id, '_aipg_episode_number', true);
+        $thumbnail = get_the_post_thumbnail_url($post_id, 'medium');
         
-        return $this->render_player($audio_url, $title, $duration, $atts['theme']);
+        return $this->render_player($audio_url, $title, $duration, $episode_num, $thumbnail, $atts['theme']);
     }
     
     /**
      * Auto-add player to podcast posts
      */
     public function auto_add_player($content) {
-        if (!is_singular('ai_podcast')) {
+        if (!is_singular('ai_podcast') || !in_the_loop() || !is_main_query()) {
             return $content;
         }
         
@@ -82,89 +99,93 @@ class AIPG_Player {
             $audio_url,
             get_the_title(),
             get_post_meta(get_the_ID(), '_aipg_duration', true),
-            'modern'
+            get_post_meta(get_the_ID(), '_aipg_episode_number', true),
+            get_the_post_thumbnail_url(get_the_ID(), 'medium'),
+            get_option('aipg_player_theme', 'dark')
         );
         
         return $player . $content;
     }
     
     /**
-     * Render player HTML
+     * Render Horizon Glass player HTML
      */
-    private function render_player($audio_url, $title, $duration, $theme = 'modern') {
+    private function render_player($audio_url, $title, $duration, $episode_num = '', $thumbnail = '', $theme = 'dark') {
+        if (empty($thumbnail)) {
+            $thumbnail = AIPG_PLUGIN_URL . 'assets/img/default-podcast.png';
+        }
+        
+        $episode_badge = $episode_num ? 'EP ' . $episode_num : 'PODCAST';
+        $duration_display = $duration ?: '--:--';
+        
         ob_start();
         ?>
-        <div class="aipg-player aipg-player-<?php echo esc_attr($theme); ?>" data-audio="<?php echo esc_url($audio_url); ?>">
-            <div class="aipg-player-inner">
-                <div class="aipg-player-artwork">
-                    <div class="aipg-play-button">
-                        <svg class="aipg-icon-play" viewBox="0 0 24 24" fill="currentColor">
+        <div class="aipg-player-wrapper" data-theme="<?php echo esc_attr($theme); ?>" data-audio-url="<?php echo esc_url($audio_url); ?>">
+            <div class="podcast-player" id="aipgPlayer-<?php echo uniqid(); ?>">
+                <audio class="aipg-audio-element" preload="metadata">
+                    <source src="<?php echo esc_url($audio_url); ?>" type="audio/mpeg">
+                </audio>
+                
+                <div class="art-wrapper">
+                    <img src="<?php echo esc_url($thumbnail); ?>" alt="<?php echo esc_attr($title); ?>">
+                    <div class="playing-indicator">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" color="white">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="track-details">
+                    <div class="track-title"><?php echo esc_html($title); ?></div>
+                    <div class="track-meta">
+                        <span class="badge"><?php echo esc_html($episode_badge); ?></span>
+                        <span class="aipg-duration-display"><?php echo esc_html($duration_display); ?></span>
+                    </div>
+
+                    <div class="progress-wrapper">
+                        <span class="time-text aipg-current-time">0:00</span>
+                        <div class="progress-bar-bg aipg-progress-bar">
+                            <div class="progress-bar-fill aipg-progress-fill" style="width: 0%"></div>
+                        </div>
+                        <span class="time-text aipg-total-time">0:00</span>
+                    </div>
+                </div>
+
+                <div class="controls-right">
+                    <button class="btn-icon-only aipg-skip-back" title="Skip back 15s" aria-label="Skip back 15 seconds">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/>
+                        </svg>
+                    </button>
+
+                    <button class="btn-main-play aipg-play-btn" aria-label="Play/Pause">
+                        <svg class="aipg-play-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M8 5v14l11-7z"/>
                         </svg>
-                        <svg class="aipg-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
-                            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                        <svg class="aipg-pause-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
                         </svg>
-                    </div>
-                    <?php if (has_post_thumbnail()): ?>
-                        <?php the_post_thumbnail('medium', array('class' => 'aipg-thumbnail')); ?>
-                    <?php else: ?>
-                        <div class="aipg-placeholder">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                            </svg>
-                        </div>
-                    <?php endif; ?>
-                </div>
-                
-                <div class="aipg-player-info">
-                    <h3 class="aipg-player-title"><?php echo esc_html($title); ?></h3>
-                    
-                    <div class="aipg-player-progress">
-                        <div class="aipg-progress-bar">
-                            <div class="aipg-progress-fill"></div>
-                            <div class="aipg-progress-handle"></div>
-                        </div>
-                        <div class="aipg-player-time">
-                            <span class="aipg-time-current">0:00</span>
-                            <span class="aipg-time-duration"><?php echo esc_html($duration ?: '--:--'); ?></span>
-                        </div>
-                    </div>
-                    
-                    <div class="aipg-player-controls">
-                        <button class="aipg-btn aipg-btn-skip-back" title="Skip back 15s">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
-                            </svg>
-                            <span>15</span>
-                        </button>
-                        
-                        <button class="aipg-btn aipg-btn-speed" title="Playback speed">
-                            <span class="aipg-speed-text">1x</span>
-                        </button>
-                        
-                        <button class="aipg-btn aipg-btn-skip-forward" title="Skip forward 30s">
-                            <span>30</span>
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>
-                            </svg>
-                        </button>
-                        
-                        <button class="aipg-btn aipg-btn-volume" title="Volume">
-                            <svg class="aipg-icon-volume-up" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-                            </svg>
-                        </button>
-                        
-                        <div class="aipg-volume-slider" style="display:none;">
-                            <input type="range" min="0" max="100" value="100" class="aipg-volume-input">
-                        </div>
+                    </button>
+
+                    <button class="btn-icon-only aipg-skip-forward" title="Skip forward 30s" aria-label="Skip forward 30 seconds">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+                        </svg>
+                    </button>
+
+                    <button class="btn-icon-only aipg-speed-btn" title="Playback speed" aria-label="Playback speed">
+                        <span class="aipg-speed-text">1x</span>
+                    </button>
+
+                    <div class="volume-control">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                        </svg>
+                        <input type="range" class="volume-slider aipg-volume-slider" min="0" max="100" value="80" aria-label="Volume">
                     </div>
                 </div>
             </div>
-            
-            <audio class="aipg-audio-element" preload="metadata">
-                <source src="<?php echo esc_url($audio_url); ?>" type="audio/mpeg">
-            </audio>
         </div>
         <?php
         return ob_get_clean();

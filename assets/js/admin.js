@@ -1,214 +1,325 @@
-// AI Podcast Generator - Admin Script
-(function($) {
-    'use strict';
-    
-    $(document).ready(function() {
-        
-        // Tab switching
-        $('.aipg-tab-btn').on('click', function() {
-            const tab = $(this).data('tab');
-            $('.aipg-tab-btn').removeClass('active');
-            $(this).addClass('active');
-            $('.aipg-tab-content').removeClass('active');
-            $('#' + tab + '-tab').addClass('active');
-        });
-        
-        // Retry generation button
-        $(document).on('click', '.aipg-retry-btn', function() {
-            const $btn = $(this);
-            const generationId = $btn.data('generation-id');
-            
-            if (!confirm('Retry this podcast generation?')) {
-                return;
-            }
-            
-            $btn.prop('disabled', true).text('Retrying...');
-            
-            $.ajax({
-                url: aipgAdmin.ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'aipg_retry_generation',
-                    nonce: aipgAdmin.nonce,
-                    generation_id: generationId
-                },
-                success: function(response) {
-                    if (response.success) {
-                        alert('Generation restarted! Refresh the page in a few minutes to check status.');
-                        location.reload();
-                    } else {
-                        alert('Error: ' + response.data);
-                        $btn.prop('disabled', false).text('Retry');
-                    }
-                },
-                error: function() {
-                    alert('AJAX error occurred');
-                    $btn.prop('disabled', false).text('Retry');
-                }
-            });
-        });
-        
-        // Manual generation form
-        $('#aipg-generate-form').on('submit', function(e) {
-            e.preventDefault();
-            
-            const postId = $('#aipg-post-select').val() || $('#aipg-post-id').val();
-            
-            if (!postId) {
-                alert('Please select or enter a post ID');
-                return;
-            }
-            
-            const hosts = parseInt($('#aipg-hosts').val());
-            const includeGuest = $('input[name="include_guest"]').is(':checked');
-            
-            // Build voice mapping dynamically based on hosts and guest
-            const voiceMapping = {};
-            for (let i = 1; i <= hosts; i++) {
-                const voiceSelect = $(`select[name="voice_host${i}"]`);
-                voiceMapping[`host_${i}`] = voiceSelect.length ? voiceSelect.val() : 'alloy';
-            }
-            
-            if (includeGuest) {
-                const guestVoice = $('select[name="voice_guest"]');
-                voiceMapping['guest'] = guestVoice.length ? guestVoice.val() : 'echo';
-            }
-            
-            // Intro/outro voices (default to host 1)
-            voiceMapping['intro'] = voiceMapping['host_1'];
-            voiceMapping['outro'] = voiceMapping['host_1'];
-            
-            console.log('Voice mapping:', voiceMapping);
-            
-            const formData = {
-                action: 'aipg_generate_manual',
-                nonce: aipgAdmin.nonce,
-                post_id: postId,
-                duration: $('#aipg-duration').val(),
-                language: $('#aipg-language').val(),
-                hosts: hosts,
-                include_guest: includeGuest ? 'yes' : 'no',
-                intro_text: $('textarea[name="intro_text"]').val(),
-                outro_text: $('textarea[name="outro_text"]').val(),
-                voice_mapping: JSON.stringify(voiceMapping)
-            };
-            
-            showStatus('Initiating podcast generation...', 'info');
-            
-            $.ajax({
-                url: aipgAdmin.ajaxurl,
-                type: 'POST',
-                data: formData,
-                success: function(response) {
-                    if (response.success) {
-                        showStatus(
-                            'Podcast generation started! Generation ID: ' + response.data.generation_id + 
-                            '. The process will continue in the background. You can check the dashboard for progress.',
-                            'success'
-                        );
-                        
-                        // Show progress monitor
-                        monitorGeneration(response.data.generation_id);
-                    } else {
-                        showStatus('Error: ' + response.data, 'error');
-                    }
-                },
-                error: function(xhr) {
-                    showStatus('AJAX error: ' + xhr.statusText, 'error');
-                }
-            });
-        });
-        
-        // Auto-select form
-        $('#aipg-auto-select-form').on('submit', function(e) {
-            e.preventDefault();
-            
-            const count = $('input[name="count"]').val();
-            
-            $('#aipg-auto-select-status').html('<div class="notice notice-info"><p>Analyzing articles and selecting the best one...</p></div>');
-            
-            $.ajax({
-                url: aipgAdmin.ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'aipg_select_article',
-                    nonce: aipgAdmin.nonce,
-                    count: count
-                },
-                success: function(response) {
-                    if (response.success) {
-                        $('#aipg-auto-select-status').html(
-                            '<div class="notice notice-success"><p>Selected: <strong>' + 
-                            response.data.title + '</strong> (ID: ' + response.data.post_id + 
-                            '). Now generating podcast...</p></div>'
-                        );
-                        
-                        // Trigger generation with selected article
-                        setTimeout(function() {
-                            $('#aipg-post-id').val(response.data.post_id);
-                            $('.aipg-tab-btn[data-tab="manual"]').click();
-                            $('#aipg-generate-form').submit();
-                        }, 2000);
-                    } else {
-                        $('#aipg-auto-select-status').html(
-                            '<div class="notice notice-error"><p>Error: ' + response.data + '</p></div>'
-                        );
-                    }
-                },
-                error: function(xhr) {
-                    $('#aipg-auto-select-status').html(
-                        '<div class="notice notice-error"><p>AJAX error: ' + xhr.statusText + '</p></div>'
-                    );
-                }
-            });
-        });
-        
-        // Dynamic voice mapping based on hosts
-        $('#aipg-hosts').on('change', function() {
-            const numHosts = parseInt($(this).val());
-            const $voiceMapping = $('#aipg-voice-mapping');
-            
-            $voiceMapping.find('.aipg-voice-row:gt(0)').remove(); // Keep Host 1
-            
-            for (let i = 2; i <= numHosts; i++) {
-                const $row = $('.aipg-voice-row:first').clone();
-                $row.find('label').text('Host ' + i + ':');
-                $row.find('select').attr('name', 'voice_host' + i);
-                $voiceMapping.append($row);
-            }
-        });
-        
-        function showStatus(message, type) {
-            const $status = $('#aipg-generation-status');
-            let className = 'notice ';
-            
-            switch(type) {
-                case 'success':
-                    className += 'notice-success';
-                    break;
-                case 'error':
-                    className += 'notice-error';
-                    break;
-                case 'info':
-                default:
-                    className += 'notice-info';
-                    break;
-            }
-            
-            $status.html('<div class="' + className + '"><p>' + message + '</p></div>').show();
-        }
-        
-        function monitorGeneration(generationId) {
-            // This would poll the server for progress updates
-            // For now, just show a static message
-            setTimeout(function() {
-                showStatus(
-                    'Generation is processing in the background. Check the <a href="' + 
-                    aipgAdmin.dashboardUrl + '">dashboard</a> for updates.',
-                    'info'
-                );
-            }, 3000);
-        }
+/**
+ * AI Podcast Generator - Professional Admin Script
+ * Handles form submission, voice preview, and dynamic UI
+ */
+
+(function ($) {
+  "use strict";
+
+  let currentAudio = null;
+
+  $(document).ready(function () {
+    // Dynamic hosts configuration
+    $("#aipg-hosts")
+      .on("change", function () {
+        const numHosts = parseInt($(this).val());
+
+        $("#aipg-host-1-config").toggle(numHosts >= 1);
+        $("#aipg-host-2-config").toggle(numHosts >= 2);
+        $("#aipg-host-3-config").toggle(numHosts >= 3);
+      })
+      .trigger("change");
+
+    // Guest toggle
+    $("#aipg-include-guest")
+      .on("change", function () {
+        $("#aipg-guest-config").toggle($(this).is(":checked"));
+      })
+      .trigger("change");
+
+    // Voice preview
+    $(".aipg-voice-preview-btn").on("click", function (e) {
+      e.preventDefault();
+      const $btn = $(this);
+      const voice = $btn
+        .closest(".aipg-voice-select-wrapper")
+        .find(".aipg-voice-select")
+        .val();
+
+      playVoicePreview(voice, $btn);
     });
-    
+
+    // Update voice preview button voice when select changes
+    $(".aipg-voice-select").on("change", function () {
+      const voice = $(this).val();
+      $(this)
+        .closest(".aipg-voice-select-wrapper")
+        .find(".aipg-voice-preview-btn")
+        .attr("data-voice", voice);
+    });
+
+    // AI Auto-Select
+    $("#aipg-auto-select-btn").on("click", function () {
+      const $btn = $(this);
+      const originalText = $btn.html();
+
+      $btn
+        .prop("disabled", true)
+        .html(
+          '<span class="dashicons dashicons-update aipg-spin"></span> Analyzing...'
+        );
+
+      $.ajax({
+        url: aipgAdmin.ajaxurl,
+        type: "POST",
+        data: {
+          action: "aipg_select_article",
+          nonce: aipgAdmin.nonce,
+          count: 20,
+        },
+        success: function (response) {
+          if (response.success) {
+            $("#aipg-post-select").val(response.data.post_id);
+            showNotice("Selected: " + response.data.title, "success");
+          } else {
+            showNotice("Error: " + response.data, "error");
+          }
+        },
+        error: function () {
+          showNotice("Network error occurred", "error");
+        },
+        complete: function () {
+          $btn.prop("disabled", false).html(originalText);
+        },
+      });
+    });
+
+    // Generate form submission
+    $("#aipg-generate-form").on("submit", function (e) {
+      e.preventDefault();
+
+      const formData = {
+        action: "aipg_generate_manual",
+        nonce: aipgAdmin.nonce,
+        post_id: $("#aipg-post-select").val(),
+        duration: $("#aipg-duration").val(),
+        language: $("#aipg-language").val(),
+        podcast_style: $("#aipg-style").val(),
+        tone: $("#aipg-tone").val(),
+        hosts: $("#aipg-hosts").val(),
+        include_guest: $("#aipg-include-guest").is(":checked") ? "yes" : "no",
+        include_emotions: $('input[name="include_emotions"]').is(":checked")
+          ? "1"
+          : "0",
+      };
+
+      // Add host names and voices
+      const numHosts = parseInt(formData.hosts);
+      for (let i = 1; i <= numHosts; i++) {
+        formData[`host_${i}_name`] = $(`input[name="host_${i}_name"]`).val();
+        formData[`voice_host_${i}`] = $(`select[name="voice_host_${i}"]`).val();
+      }
+
+      // Add guest if included
+      if (formData.include_guest === "yes") {
+        formData.guest_name = $('input[name="guest_name"]').val();
+        formData.voice_guest = $('select[name="voice_guest"]').val();
+      }
+
+      console.log("Submitting:", formData);
+
+      showStatusMessage("Initiating podcast generation...", "info", true);
+
+      $.ajax({
+        url: aipgAdmin.ajaxurl,
+        type: "POST",
+        data: formData,
+        success: function (response) {
+          if (response.success) {
+            showStatusMessage(
+              "<strong>Success!</strong> Podcast generation started (ID: #" +
+                response.data.generation_id +
+                "). " +
+                "The process will continue in the background. " +
+                '<a href="' +
+                aipgAdmin.dashboardUrl +
+                '">View dashboard</a> to monitor progress.',
+              "success"
+            );
+
+            // Reset form after short delay
+            setTimeout(function () {
+              $("#aipg-generate-form")[0].reset();
+              $("#aipg-hosts").trigger("change");
+            }, 3000);
+          } else {
+            showStatusMessage(
+              "<strong>Error:</strong> " + response.data,
+              "error"
+            );
+          }
+        },
+        error: function (xhr) {
+          showStatusMessage(
+            "<strong>Network Error:</strong> " + xhr.statusText,
+            "error"
+          );
+        },
+      });
+    });
+
+    // Retry generation
+    $(document).on("click", ".aipg-retry-btn", function () {
+      const $btn = $(this);
+      const generationId = $btn.data("generation-id");
+
+      if (!confirm("Retry this podcast generation?")) {
+        return;
+      }
+
+      $btn
+        .prop("disabled", true)
+        .html('<span class="dashicons dashicons-update aipg-spin"></span>');
+
+      $.ajax({
+        url: aipgAdmin.ajaxurl,
+        type: "POST",
+        data: {
+          action: "aipg_retry_generation",
+          nonce: aipgAdmin.nonce,
+          generation_id: generationId,
+        },
+        success: function (response) {
+          if (response.success) {
+            showNotice(
+              "Generation restarted! Refresh page to see updates.",
+              "success"
+            );
+            setTimeout(function () {
+              location.reload();
+            }, 2000);
+          } else {
+            showNotice("Error: " + response.data, "error");
+            $btn
+              .prop("disabled", false)
+              .html('<span class="dashicons dashicons-update"></span> Retry');
+          }
+        },
+        error: function () {
+          showNotice("Network error occurred", "error");
+          $btn
+            .prop("disabled", false)
+            .html('<span class="dashicons dashicons-update"></span> Retry');
+        },
+      });
+    });
+
+    // View error
+    $(document).on("click", ".aipg-view-error-btn", function () {
+      const error = $(this).data("error");
+      alert("Error Details:\n\n" + error);
+    });
+  });
+
+  /**
+   * Play voice preview
+   */
+  function playVoicePreview(voice, $btn) {
+    // Stop current audio if playing
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+      $(".aipg-voice-preview-btn").removeClass("is-playing");
+    }
+
+    $btn.prop("disabled", true).addClass("is-playing");
+
+    $.ajax({
+      url: aipgAdmin.ajaxurl,
+      type: "POST",
+      data: {
+        action: "aipg_preview_voice",
+        nonce: aipgAdmin.nonce,
+        voice: voice,
+        text:
+          "Hi! This is a preview of the " +
+          voice +
+          " voice. How do you like the sound?",
+      },
+      success: function (response) {
+        if (response.success) {
+          currentAudio = new Audio(response.data.url);
+
+          currentAudio.addEventListener("ended", function () {
+            $btn.prop("disabled", false).removeClass("is-playing");
+            currentAudio = null;
+          });
+
+          currentAudio.addEventListener("error", function () {
+            showNotice("Error playing audio preview", "error");
+            $btn.prop("disabled", false).removeClass("is-playing");
+            currentAudio = null;
+          });
+
+          currentAudio.play();
+        } else {
+          showNotice("Error: " + response.data, "error");
+          $btn.prop("disabled", false).removeClass("is-playing");
+        }
+      },
+      error: function () {
+        showNotice("Network error occurred", "error");
+        $btn.prop("disabled", false).removeClass("is-playing");
+      },
+    });
+
+    // Allow click to stop
+    $btn.one("click", function (e) {
+      e.preventDefault();
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+        $btn.prop("disabled", false).removeClass("is-playing");
+      }
+    });
+  }
+
+  /**
+   * Show status message in generate page
+   */
+  function showStatusMessage(message, type, loading = false) {
+    const $status = $("#aipg-generation-status");
+    let className =
+      "notice notice-" +
+      (type === "error" ? "error" : type === "success" ? "success" : "info");
+
+    if (loading) {
+      message =
+        '<span class="dashicons dashicons-update aipg-spin"></span> ' + message;
+    }
+
+    $status
+      .html('<div class="' + className + '"><p>' + message + "</p></div>")
+      .show();
+  }
+
+  /**
+   * Show notice (for other pages)
+   */
+  function showNotice(message, type) {
+    const $notice = $(
+      '<div class="notice notice-' +
+        type +
+        ' is-dismissible"><p>' +
+        message +
+        "</p></div>"
+    );
+
+    $(".aipg-wrap").prepend($notice);
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(function () {
+      $notice.fadeOut(function () {
+        $(this).remove();
+      });
+    }, 5000);
+  }
+
+  // Add spinning animation for loading icons
+  $("<style>")
+    .prop("type", "text/css")
+    .html(
+      ".aipg-spin { animation: aipg-spin 1s linear infinite; } @keyframes aipg-spin { to { transform: rotate(360deg); } }"
+    )
+    .appendTo("head");
 })(jQuery);
