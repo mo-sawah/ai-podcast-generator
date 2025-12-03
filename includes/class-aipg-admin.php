@@ -20,6 +20,7 @@ class AIPG_Admin {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
         add_action('admin_init', array($this, 'register_settings'));
+        add_action('wp_ajax_aipg_test_tts_access', array($this, 'ajax_test_tts_access'));
     }
     
     /**
@@ -613,6 +614,7 @@ class AIPG_Admin {
             update_option('aipg_openrouter_key', sanitize_text_field($_POST['aipg_openrouter_key']));
             update_option('aipg_openai_key', sanitize_text_field($_POST['aipg_openai_key']));
             update_option('aipg_tavily_key', sanitize_text_field($_POST['aipg_tavily_key']));
+            update_option('aipg_tts_model', sanitize_text_field($_POST['aipg_tts_model']));
             update_option('aipg_player_theme', sanitize_text_field($_POST['aipg_player_theme']));
             update_option('aipg_enable_search', isset($_POST['aipg_enable_search']));
             update_option('aipg_enable_emotions', isset($_POST['aipg_enable_emotions']));
@@ -682,6 +684,58 @@ class AIPG_Admin {
                                 <p class="description">
                                     <?php _e('Optional. For web search enhancement. Get your key from', 'ai-podcast-gen'); ?>
                                     <a href="https://tavily.com" target="_blank">Tavily</a>
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <!-- TTS Quality Settings -->
+                <div class="aipg-card">
+                    <h2><?php _e('TTS Quality Settings', 'ai-podcast-gen'); ?></h2>
+                    <p class="aipg-form-help"><?php _e('Choose audio quality and test API access', 'ai-podcast-gen'); ?></p>
+                    
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row">
+                                <label for="aipg_tts_model"><?php _e('Audio Quality', 'ai-podcast-gen'); ?></label>
+                            </th>
+                            <td>
+                                <select id="aipg_tts_model" name="aipg_tts_model" class="regular-text">
+                                    <option value="gpt-4o-mini-tts" <?php selected(get_option('aipg_tts_model', 'gpt-4o-mini-tts'), 'gpt-4o-mini-tts'); ?>>
+                                        <?php _e('🚀 GPT-4o Mini TTS - Newest! Supports emotion instructions', 'ai-podcast-gen'); ?>
+                                    </option>
+                                    <option value="tts-1-hd" <?php selected(get_option('aipg_tts_model', 'gpt-4o-mini-tts'), 'tts-1-hd'); ?>>
+                                        <?php _e('🎵 HD Quality (tts-1-hd) - Best quality, requires paid account', 'ai-podcast-gen'); ?>
+                                    </option>
+                                    <option value="tts-1" <?php selected(get_option('aipg_tts_model', 'gpt-4o-mini-tts'), 'tts-1'); ?>>
+                                        <?php _e('🔊 Standard Quality (tts-1) - Good quality, faster', 'ai-podcast-gen'); ?>
+                                    </option>
+                                </select>
+                                <p class="description">
+                                    <strong><?php _e('🚀 NEW: GPT-4o Mini TTS', 'ai-podcast-gen'); ?></strong><br>
+                                    • <?php _e('OpenAI\'s newest and most reliable TTS model', 'ai-podcast-gen'); ?><br>
+                                    • <?php _e('Supports emotion instructions for better delivery', 'ai-podcast-gen'); ?><br>
+                                    • <?php _e('Works with [excited], [thoughtful], [calm] emotion tags', 'ai-podcast-gen'); ?><br>
+                                    <br>
+                                    <strong><?php _e('HD Quality requires:', 'ai-podcast-gen'); ?></strong><br>
+                                    • <?php _e('Paid OpenAI account with billing enabled', 'ai-podcast-gen'); ?><br>
+                                    • <?php _e('Add payment at:', 'ai-podcast-gen'); ?> 
+                                    <a href="https://platform.openai.com/account/billing/overview" target="_blank">platform.openai.com/account/billing</a>
+                                </p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row"><?php _e('Test API Access', 'ai-podcast-gen'); ?></th>
+                            <td>
+                                <button type="button" id="aipg-test-tts" class="button button-secondary">
+                                    <span class="dashicons dashicons-admin-tools"></span>
+                                    <?php _e('Test TTS Models', 'ai-podcast-gen'); ?>
+                                </button>
+                                <div id="aipg-tts-test-results" style="margin-top: 15px;"></div>
+                                <p class="description">
+                                    <?php _e('Click to verify which TTS models your API key has access to', 'ai-podcast-gen'); ?>
                                 </p>
                             </td>
                         </tr>
@@ -927,5 +981,29 @@ class AIPG_Admin {
             </div>
         </div>
         <?php
+    }
+    
+    /**
+     * AJAX handler to test TTS model access
+     */
+    public function ajax_test_tts_access() {
+        check_ajax_referer('aipg_test_tts', 'nonce');
+        
+        $openai_key = get_option('aipg_openai_key');
+        
+        if (empty($openai_key)) {
+            wp_send_json_error(array(
+                'message' => __('OpenAI API key not configured. Please add your key first.', 'ai-podcast-gen')
+            ));
+        }
+        
+        require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-openai-tts.php';
+        $tts = new AIPG_OpenAI_TTS($openai_key);
+        
+        $results = $tts->test_tts_access();
+        
+        wp_send_json_success(array(
+            'results' => $results
+        ));
     }
 }

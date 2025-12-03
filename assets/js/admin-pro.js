@@ -9,6 +9,125 @@
   let currentAudio = null;
 
   $(document).ready(function () {
+    // TTS Model Test Button
+    $("#aipg-test-tts").on("click", function () {
+      const $btn = $(this);
+      const $results = $("#aipg-tts-test-results");
+
+      $btn
+        .prop("disabled", true)
+        .html(
+          '<span class="dashicons dashicons-update aipg-spin"></span> Testing...'
+        );
+      $results.html(
+        '<p style="color: #666;"><em>Testing all TTS models...</em></p>'
+      );
+
+      $.ajax({
+        url: aipgAdmin.ajaxurl,
+        type: "POST",
+        data: {
+          action: "aipg_test_tts_access",
+          nonce: aipgAdmin.nonce,
+        },
+        success: function (response) {
+          if (response.success) {
+            let html =
+              '<div class="aipg-tts-test-results" style="border-left: 4px solid #7d5fff; padding-left: 15px; margin-top: 10px;">';
+            const results = response.data.results;
+
+            // Test gpt-4o-mini-tts (NEW!)
+            if (results["gpt-4o-mini-tts"]) {
+              const test = results["gpt-4o-mini-tts"];
+              if (test.success) {
+                html +=
+                  '<p style="color: #28a745; margin: 8px 0; font-weight: 500;"><strong>✅ GPT-4o Mini TTS (NEW!):</strong> ' +
+                  test.message +
+                  "</p>";
+                html +=
+                  '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>🚀 This is the newest model with emotion instructions support!</em></p>';
+              } else {
+                html +=
+                  '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ GPT-4o Mini TTS:</strong> ' +
+                  test.error +
+                  "</p>";
+                html +=
+                  '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><small>Try using Standard Quality (tts-1) instead.</small></p>';
+              }
+            }
+
+            // Test tts-1 (Standard)
+            if (results["tts-1"]) {
+              const test = results["tts-1"];
+              if (test.success) {
+                html +=
+                  '<p style="color: #28a745; margin: 8px 0;"><strong>✅ Standard Quality (tts-1):</strong> ' +
+                  test.message +
+                  "</p>";
+              } else {
+                html +=
+                  '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ Standard Quality (tts-1):</strong> ' +
+                  test.error +
+                  "</p>";
+              }
+            }
+
+            // Test tts-1-hd (HD)
+            if (results["tts-1-hd"]) {
+              const test = results["tts-1-hd"];
+              if (test.success) {
+                html +=
+                  '<p style="color: #28a745; margin: 8px 0;"><strong>✅ HD Quality (tts-1-hd):</strong> ' +
+                  test.message +
+                  "</p>";
+                html +=
+                  '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>💎 HD quality is available! 2x cost but noticeably better audio.</em></p>';
+              } else {
+                html +=
+                  '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ HD Quality (tts-1-hd):</strong> ' +
+                  test.error +
+                  "</p>";
+                if (
+                  test.error.includes("model") ||
+                  test.error.includes("access") ||
+                  test.error.includes("valid")
+                ) {
+                  html +=
+                    '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><strong>💡 To enable HD quality:</strong><br>';
+                  html +=
+                    '1. Go to <a href="https://platform.openai.com/account/billing/overview" target="_blank">OpenAI Billing</a><br>';
+                  html += "2. Add a payment method<br>";
+                  html += "3. Add at least $10 credit<br>";
+                  html += "4. Test again!<br>";
+                  html +=
+                    "<small>Cost: HD is $0.030 per 1K characters (2x standard)</small></p>";
+                }
+              }
+            }
+
+            html += "</div>";
+            $results.html(html);
+          } else {
+            $results.html(
+              '<p style="color: #dc3545;">' + response.data.message + "</p>"
+            );
+          }
+        },
+        error: function () {
+          $results.html(
+            '<p style="color: #dc3545;">❌ Test failed. Please check your OpenAI API key.</p>'
+          );
+        },
+        complete: function () {
+          $btn
+            .prop("disabled", false)
+            .html(
+              '<span class="dashicons dashicons-admin-tools"></span> Test TTS Models'
+            );
+        },
+      });
+    });
+
     // Dynamic hosts configuration
     $("#aipg-hosts")
       .on("change", function () {

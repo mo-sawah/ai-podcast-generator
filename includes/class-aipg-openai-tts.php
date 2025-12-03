@@ -13,7 +13,7 @@ class AIPG_OpenAI_TTS {
     private $base_url = 'https://api.openai.com/v1/audio/speech';
     private $chunk_limit = 4000; // Safe limit below 4096
     
-    // Available voices with characteristics
+    // Available voices with characteristics (updated for gpt-4o-mini-tts)
     private $voices = array(
         'alloy' => array('gender' => 'neutral', 'style' => 'balanced'),
         'ash' => array('gender' => 'male', 'style' => 'clear'),
@@ -246,16 +246,154 @@ class AIPG_OpenAI_TTS {
     }
     
     /**
+     * Test TTS API access and model availability
+     */
+    public function test_tts_access() {
+        $results = array();
+        
+        // Test gpt-4o-mini-tts (newest model with instructions support)
+        $test_text = "Testing GPT-4o Mini TTS.";
+        $results['gpt-4o-mini-tts'] = $this->test_model('gpt-4o-mini-tts', $test_text);
+        
+        // Test tts-1 (standard)
+        $test_text = "Testing standard quality.";
+        $results['tts-1'] = $this->test_model('tts-1', $test_text);
+        
+        // Test tts-1-hd (HD quality)
+        $test_text = "Testing HD quality.";
+        $results['tts-1-hd'] = $this->test_model('tts-1-hd', $test_text);
+        
+        return $results;
+    }
+    
+    /**
+     * Test a specific TTS model
+     */
+    private function test_model($model, $text) {
+        $body = array(
+            'model' => $model,
+            'input' => $text,
+            'voice' => 'alloy',
+            'response_format' => 'mp3',
+        );
+        
+        $response = wp_remote_post($this->base_url, array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $this->api_key,
+                'Content-Type' => 'application/json',
+            ),
+            'body' => json_encode($body),
+            'timeout' => 30,
+        ));
+        
+        if (is_wp_error($response)) {
+            return array(
+                'success' => false,
+                'error' => $response->get_error_message(),
+            );
+        }
+        
+        $status_code = wp_remote_retrieve_response_code($response);
+        
+        if ($status_code === 200) {
+            return array(
+                'success' => true,
+                'message' => ucfirst($model) . ' is available!',
+            );
+        } else {
+            $body_content = wp_remote_retrieve_body($response);
+            $error = json_decode($body_content, true);
+            
+            return array(
+                'success' => false,
+                'error' => isset($error['error']['message']) ? $error['error']['message'] : 'Unknown error',
+                'status_code' => $status_code,
+            );
+        }
+    }
+    
+    /**
      * Generate single audio chunk
      */
     private function generate_single_audio($text, $voice, $settings) {
+        // Get model from settings or use saved preference
+        $model = isset($settings['model']) ? strtolower($settings['model']) : get_option('aipg_tts_model', 'gpt-4o-mini-tts');
+        
+        // Map common model names to valid OpenAI models
+        $model_map = array(
+            'gpt-4o-mini-tts' => 'gpt-4o-mini-tts',
+            'tts-1-hd' => 'tts-1-hd',
+            'tts-1' => 'tts-1',
+            'hd' => 'tts-1-hd',
+            'standard' => 'tts-1',
+            'mini' => 'gpt-4o-mini-tts',
+        );
+        
+        $model = isset($model_map[$model]) ? $model_map[$model] : 'gpt-4o-mini-tts';
+        
+        // Process text based on model capabilities
+        $instructions = null;
+        if ($model === 'gpt-4o-mini-tts') {
+            // New model: supports instructions parameter for emotion control!
+            $base_instructions = 'Speak in a natural, engaging manner for a podcast conversation';
+            
+            // Extract emotion tags and convert to instructions
+            $emotion_instructions = array();
+            if (stripos($text, '[excited]') !== false) {
+                $emotion_instructions[] = 'with excitement and energy';
+                $text = str_ireplace('[excited]', '', $text);
+            }
+            if (stripos($text, '[thoughtful]') !== false) {
+                $emotion_instructions[] = 'in a thoughtful, contemplative manner';
+                $text = str_ireplace('[thoughtful]', '', $text);
+            }
+            if (stripos($text, '[concerned]') !== false) {
+                $emotion_instructions[] = 'with concern and care';
+                $text = str_ireplace('[concerned]', '', $text);
+            }
+            if (stripos($text, '[happy]') !== false) {
+                $emotion_instructions[] = 'with happiness and joy';
+                $text = str_ireplace('[happy]', '', $text);
+            }
+            if (stripos($text, '[curious]') !== false) {
+                $emotion_instructions[] = 'with curiosity and interest';
+                $text = str_ireplace('[curious]', '', $text);
+            }
+            if (stripos($text, '[calm]') !== false) {
+                $emotion_instructions[] = 'in a calm, soothing manner';
+                $text = str_ireplace('[calm]', '', $text);
+            }
+            
+            if (!empty($emotion_instructions)) {
+                $instructions = $base_instructions . ' ' . implode(', ', $emotion_instructions) . '.';
+            } else {
+                $instructions = $base_instructions . '.';
+            }
+            
+            $text = trim($text);
+        } else {
+            // Old models: use punctuation for emotions (fallback)
+            $text = $this->process_emotion_tags($text);
+        }
+        
         $body = array(
-            'model' => $settings['model'],
+            'model' => $model,
             'input' => $text,
             'voice' => $voice,
-            'speed' => $settings['speed'],
             'response_format' => 'mp3',
         );
+        
+        // Add instructions for gpt-4o-mini-tts
+        if ($model === 'gpt-4o-mini-tts' && !empty($instructions)) {
+            $body['instructions'] = $instructions;
+        }
+        
+        // Only add speed if not default
+        if (isset($settings['speed']) && $settings['speed'] != 1.0) {
+            $body['speed'] = floatval($settings['speed']);
+        }
+        
+        error_log("AIPG TTS: Generating audio with model={$model}, voice={$voice}, text_length=" . strlen($text) . ($instructions ? ", instructions={$instructions}" : ""));
         
         $response = wp_remote_post($this->base_url, array(
             'headers' => array(
@@ -275,9 +413,32 @@ class AIPG_OpenAI_TTS {
         if ($status_code !== 200) {
             $body_content = wp_remote_retrieve_body($response);
             $error = json_decode($body_content, true);
-            return new WP_Error('tts_error', 
-                isset($error['error']['message']) ? $error['error']['message'] : 'TTS generation failed'
-            );
+            
+            $error_message = isset($error['error']['message']) ? $error['error']['message'] : 'TTS generation failed';
+            
+            error_log("AIPG TTS Error (Status {$status_code}): {$error_message}");
+            error_log("AIPG TTS Error Details: {$body_content}");
+            
+            // Provide helpful error messages based on model
+            if ($model === 'gpt-4o-mini-tts' && (strpos($error_message, 'model') !== false || strpos($error_message, 'access') !== false)) {
+                $helpful_message = "GPT-4o Mini TTS requires API access. ";
+                $helpful_message .= "This is OpenAI's newest TTS model. ";
+                $helpful_message .= "Try using Standard Quality (tts-1) in Settings if this doesn't work. ";
+                $helpful_message .= "Original error: {$error_message}";
+                
+                return new WP_Error('tts_model_access', $helpful_message);
+            }
+            
+            if ($model === 'tts-1-hd' && (strpos($error_message, 'model') !== false || strpos($error_message, 'access') !== false)) {
+                $helpful_message = "HD Quality (tts-1-hd) requires a paid OpenAI account. ";
+                $helpful_message .= "Please add a payment method at https://platform.openai.com/account/billing/overview ";
+                $helpful_message .= "or switch to GPT-4o Mini TTS or Standard Quality (tts-1) in Settings. ";
+                $helpful_message .= "Original error: {$error_message}";
+                
+                return new WP_Error('tts_hd_access', $helpful_message);
+            }
+            
+            return new WP_Error('tts_error', $error_message);
         }
         
         // Save audio file
@@ -608,7 +769,7 @@ class AIPG_OpenAI_TTS {
         }
         
         $settings = array(
-            'model' => 'tts-1',
+            'model' => 'tts-1', // Use standard model for previews
             'speed' => 1.0,
         );
         
