@@ -247,31 +247,40 @@ class AIPG_Generator {
             // Get TTS provider
             $provider = get_option('aipg_tts_provider', 'openai');
             
-            error_log('AIPG: TTS Provider selected: ' . $provider);
-            error_log('AIPG: TTS Provider option value: ' . get_option('aipg_tts_provider', 'NOT SET'));
+            error_log('AIPG: ========== AUDIO GENERATION START ==========');
+            error_log('AIPG: TTS Provider: ' . $provider);
+            error_log('AIPG: Original Voice Mapping: ' . json_encode($settings['voice_mapping'] ?? 'NONE'));
             
             if ($provider === 'elevenlabs') {
                 error_log('AIPG: Using ElevenLabs TTS');
                 require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-elevenlabs-tts.php';
                 $tts = new AIPG_ElevenLabs_TTS();
                 
-                // Map OpenAI voices to ElevenLabs voices if needed
-                if (isset($settings['voice_mapping'])) {
+                // Map OpenAI voices to ElevenLabs voices
+                if (isset($settings['voice_mapping']) && !empty($settings['voice_mapping'])) {
                     $original_mapping = $settings['voice_mapping'];
                     $mapped_voices = array();
-                    foreach ($settings['voice_mapping'] as $speaker => $voice) {
-                        $mapped_voices[$speaker] = $tts->map_openai_voice($voice);
+                    
+                    foreach ($original_mapping as $speaker => $voice) {
+                        $mapped_voice = $tts->map_openai_voice($voice);
+                        $mapped_voices[$speaker] = $mapped_voice;
+                        error_log("AIPG: Mapping {$speaker}: {$voice} → {$mapped_voice}");
                     }
+                    
                     $settings['voice_mapping'] = $mapped_voices;
-                    error_log('AIPG: Mapped voices from ' . json_encode($original_mapping) . ' to ' . json_encode($mapped_voices));
+                    error_log('AIPG: Final ElevenLabs Voice Mapping: ' . json_encode($mapped_voices));
+                } else {
+                    error_log('AIPG: WARNING - No voice mapping found!');
                 }
             } else {
                 error_log('AIPG: Using OpenAI TTS');
                 require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-openai-tts.php';
                 $tts = new AIPG_OpenAI_TTS();
+                error_log('AIPG: OpenAI Voice Mapping: ' . json_encode($settings['voice_mapping'] ?? 'NONE'));
             }
             
             error_log('AIPG: TTS Class: ' . get_class($tts));
+            error_log('AIPG: ========================================');
             
             $audio_chunks = $tts->generate_podcast_audio($script_result, $settings);
             
@@ -286,11 +295,16 @@ class AIPG_Generator {
             // Step 4: Merge audio
             AIPG_Database::update_generation($generation_id, array('status' => 'merging_audio'));
             
+            error_log('AIPG: Starting audio merge with ' . count($audio_chunks) . ' chunks');
+            
             $final_audio = $tts->merge_audio_chunks($audio_chunks);
             
             if (is_wp_error($final_audio)) {
+                error_log('AIPG: Merge failed - ' . $final_audio->get_error_message());
                 throw new Exception('Audio merge failed: ' . $final_audio->get_error_message());
             }
+            
+            error_log('AIPG: Audio merged successfully: ' . $final_audio);
             
             // Step 5: Generate AI summary
             AIPG_Database::update_generation($generation_id, array('status' => 'generating_summary'));

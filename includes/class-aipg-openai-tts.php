@@ -368,14 +368,13 @@ class AIPG_OpenAI_TTS {
             error_log("AIPG TTS Error (Status {$status_code}): {$error_message}");
             error_log("AIPG TTS Error Details: {$body_content}");
             
-            // Provide helpful error messages based on model
+            // AUTO-FALLBACK: If tts-1-hd fails due to model access, automatically try tts-1
             if ($model === 'tts-1-hd' && (strpos($error_message, 'model') !== false || strpos($error_message, 'access') !== false || strpos($error_message, 'valid') !== false)) {
-                $helpful_message = "HD Quality (tts-1-hd) requires a paid OpenAI account with billing enabled. ";
-                $helpful_message .= "Please add a payment method at https://platform.openai.com/account/billing/overview ";
-                $helpful_message .= "or switch to Standard Quality (tts-1) in Settings. ";
-                $helpful_message .= "Original error: {$error_message}";
+                error_log("AIPG TTS: HD model failed, automatically falling back to tts-1 (Standard)");
                 
-                return new WP_Error('tts_hd_access', $helpful_message);
+                // Retry with tts-1 instead
+                $settings['model'] = 'tts-1';
+                return $this->generate_single_audio($text, $voice, $settings);
             }
             
             // For any TTS error, provide helpful context
