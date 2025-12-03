@@ -59,20 +59,38 @@
                 return;
             }
             
+            const hosts = parseInt($('#aipg-hosts').val());
+            const includeGuest = $('input[name="include_guest"]').is(':checked');
+            
+            // Build voice mapping dynamically based on hosts and guest
+            const voiceMapping = {};
+            for (let i = 1; i <= hosts; i++) {
+                const voiceSelect = $(`select[name="voice_host${i}"]`);
+                voiceMapping[`host_${i}`] = voiceSelect.length ? voiceSelect.val() : 'alloy';
+            }
+            
+            if (includeGuest) {
+                const guestVoice = $('select[name="voice_guest"]');
+                voiceMapping['guest'] = guestVoice.length ? guestVoice.val() : 'echo';
+            }
+            
+            // Intro/outro voices (default to host 1)
+            voiceMapping['intro'] = voiceMapping['host_1'];
+            voiceMapping['outro'] = voiceMapping['host_1'];
+            
+            console.log('Voice mapping:', voiceMapping);
+            
             const formData = {
                 action: 'aipg_generate_manual',
                 nonce: aipgAdmin.nonce,
                 post_id: postId,
                 duration: $('#aipg-duration').val(),
                 language: $('#aipg-language').val(),
-                hosts: $('#aipg-hosts').val(),
-                include_guest: $('input[name="include_guest"]').is(':checked') ? 'yes' : 'no',
+                hosts: hosts,
+                include_guest: includeGuest ? 'yes' : 'no',
                 intro_text: $('textarea[name="intro_text"]').val(),
                 outro_text: $('textarea[name="outro_text"]').val(),
-                voice_mapping: JSON.stringify({
-                    'Host 1': $('select[name="voice_host1"]').val(),
-                    'Host 2': $('select[name="voice_host2"]').val(),
-                })
+                voice_mapping: JSON.stringify(voiceMapping)
             };
             
             showStatus('Initiating podcast generation...', 'info');

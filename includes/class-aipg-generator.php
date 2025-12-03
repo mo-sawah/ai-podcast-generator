@@ -69,14 +69,42 @@ class AIPG_Generator {
         $hosts = intval($_POST['hosts'] ?? 2);
         $include_guest = isset($_POST['include_guest']) && $_POST['include_guest'] === 'yes';
         
+        // Get voice mapping
+        $voice_mapping_raw = json_decode(stripslashes($_POST['voice_mapping'] ?? '{}'), true);
+        
+        // Host names (for script)
+        $host_names = array('Alex', 'Sam', 'Jordan');
+        $guest_name = 'Expert';
+        
+        // Build proper voice mapping
+        $voice_mapping = array();
+        for ($i = 1; $i <= $hosts; $i++) {
+            $key = "Host {$i}";
+            $voice_mapping[$key] = $voice_mapping_raw["host_{$i}"] ?? 'alloy';
+        }
+        
+        if ($include_guest) {
+            $voice_mapping[$guest_name] = $voice_mapping_raw['guest'] ?? 'echo';
+        }
+        
+        // Add intro/outro voices
+        $voice_mapping['intro'] = $voice_mapping_raw['intro'] ?? $voice_mapping['Host 1'];
+        $voice_mapping['outro'] = $voice_mapping_raw['outro'] ?? $voice_mapping['Host 1'];
+        
+        error_log('AIPG: Voice mapping - ' . json_encode($voice_mapping));
+        
         $settings = array(
             'duration' => $duration,
             'language' => $language,
             'hosts' => $hosts,
+            'host_names' => $host_names,
             'guest' => $include_guest,
+            'guest_name' => $guest_name,
             'intro_text' => sanitize_textarea_field($_POST['intro_text'] ?? ''),
             'outro_text' => sanitize_textarea_field($_POST['outro_text'] ?? ''),
-            'voice_mapping' => json_decode(stripslashes($_POST['voice_mapping'] ?? '{}'), true),
+            'voice_mapping' => $voice_mapping,
+            'model' => 'tts-1-hd',
+            'speed' => 1.0,
         );
         
         // Create generation record

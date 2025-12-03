@@ -351,10 +351,11 @@ class AIPG_OpenAI_TTS {
     }
     
     /**
-     * Simple fallback: concatenate with PHP
+     * Simple fallback: use MP3 concatenation library or raw concat
+     * NOTE: Simple binary concat of MP3s may have issues due to ID3 tags
      */
     private function simple_merge_fallback($chunks) {
-        error_log('AIPG: Using PHP binary concatenation fallback');
+        error_log('AIPG: Using PHP MP3 concatenation fallback');
         
         $upload_dir = wp_upload_dir();
         $podcast_dir = $upload_dir['basedir'] . '/ai-podcasts/';
@@ -363,16 +364,35 @@ class AIPG_OpenAI_TTS {
             wp_mkdir_p($podcast_dir);
         }
         
-        // Try PHP binary concatenation
         $output_file = $podcast_dir . 'podcast_merged_' . uniqid() . '.mp3';
         $merged_content = '';
         $total_size = 0;
+        $first_chunk = true;
         
         foreach ($chunks as $index => $chunk) {
             if (isset($chunk['file']['path']) && file_exists($chunk['file']['path'])) {
                 $content = file_get_contents($chunk['file']['path']);
                 if ($content !== false) {
-                    $merged_content .= $content;
+                    // For first chunk, keep everything including ID3 tag
+                    if ($first_chunk) {
+                        $merged_content .= $content;
+                        $first_chunk = false;
+                    } else {
+                        // For subsequent chunks, try to skip ID3v2 tag (if present)
+                        // ID3v2 starts with "ID3" and has 10-byte header
+                        if (substr($content, 0, 3) === 'ID3') {
+                            // Get tag size from header (bytes 6-9, syncsafe integer)
+                            $size_bytes = substr($content, 6, 4);
+                            $size = (ord($size_bytes[0]) & 0x7F) << 21 |
+                                   (ord($size_bytes[1]) & 0x7F) << 14 |
+                                   (ord($size_bytes[2]) & 0x7F) << 7 |
+                                   (ord($size_bytes[3]) & 0x7F);
+                            // Skip ID3 tag (10 byte header + tag size)
+                            $content = substr($content, 10 + $size);
+                        }
+                        $merged_content .= $content;
+                    }
+                    
                     $size = strlen($content);
                     $total_size += $size;
                     error_log('AIPG: Merged chunk ' . ($index + 1) . ': ' . $size . ' bytes');
