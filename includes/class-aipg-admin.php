@@ -815,11 +815,19 @@ class AIPG_Admin {
                             </th>
                             <td>
                                 <select id="aipg_tts_model" name="aipg_tts_model" class="regular-text">
-                                    <option value="tts-1" <?php selected(get_option('aipg_tts_model', 'tts-1'), 'tts-1'); ?>>
-                                        <?php _e('🔊 Standard Quality (tts-1)', 'ai-podcast-gen'); ?>
+                                    <option value="gpt-4o-mini-tts" <?php selected(get_option('aipg_tts_model', 'gpt-4o-mini-tts'), 'gpt-4o-mini-tts'); ?>>
+                                        🔊 Fast & Cost-effective (gpt-4o-mini-tts)
                                     </option>
-                                    <option value="tts-1-hd" <?php selected(get_option('aipg_tts_model', 'tts-1'), 'tts-1-hd'); ?>>
-                                        <?php _e('🎵 HD Quality (tts-1-hd)', 'ai-podcast-gen'); ?>
+                                    <option value="gpt-4o-tts" <?php selected(get_option('aipg_tts_model', 'gpt-4o-mini-tts'), 'gpt-4o-tts'); ?>>
+                                        🎵 Higher Quality (gpt-4o-tts)
+                                    </option>
+
+                                    <!-- Legacy choices – still work because of the map above -->
+                                    <option value="tts-1" <?php selected(get_option('aipg_tts_model', 'gpt-4o-mini-tts'), 'tts-1'); ?>>
+                                        (Legacy) Standard (tts-1)
+                                    </option>
+                                    <option value="tts-1-hd" <?php selected(get_option('aipg_tts_model', 'gpt-4o-mini-tts'), 'tts-1-hd'); ?>>
+                                        (Legacy) HD (tts-1-hd)
                                     </option>
                                 </select>
                                 <p class="description">

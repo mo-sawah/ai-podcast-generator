@@ -312,28 +312,41 @@ class AIPG_OpenAI_TTS {
      * Generate single audio chunk
      */
     private function generate_single_audio($text, $voice, $settings) {
-        // Get model from settings or use saved preference
-        // DEFAULT TO tts-1 (works with all API keys)
-        $model = isset($settings['model']) ? strtolower($settings['model']) : get_option('aipg_tts_model', 'tts-1');
-        
-        // Map common model names to valid OpenAI models
-        // ONLY tts-1 and tts-1-hd work with regular OpenAI API!
+        // Get raw model name (from settings or option)
+        $raw_model = isset($settings['model'])
+            ? strtolower(trim($settings['model']))
+            : strtolower(trim(get_option('aipg_tts_model', 'gpt-4o-mini-tts')));
+
+        // Map friendly / legacy names to actual OpenAI models
         $model_map = array(
-            'tts-1' => 'tts-1',
-            'tts-1-hd' => 'tts-1-hd',
-            'hd' => 'tts-1-hd',
-            'standard' => 'tts-1',
+            // New recommended models
+            'gpt-4o-mini-tts' => 'gpt-4o-mini-tts', // fast, cheap
+            'gpt-4o-tts'      => 'gpt-4o-tts',      // higher quality
+
+            // Legacy aliases – map them to new models so they keep working
+            'tts-1'           => 'gpt-4o-mini-tts',
+            'standard'        => 'gpt-4o-mini-tts',
+            'tts-1-hd'        => 'gpt-4o-tts',
+            'hd'              => 'gpt-4o-tts',
         );
-        
-        $model = isset($model_map[$model]) ? $model_map[$model] : 'tts-1';
-        
-        // Process emotion tags (old method with punctuation since we don't have instructions parameter)
+
+        if (!isset($model_map[$raw_model])) {
+            // Fallback to mini TTS if something weird is saved in the DB
+            $model = 'gpt-4o-mini-tts';
+        } else {
+            $model = $model_map[$raw_model];
+        }
+
+        // Optional: quick debug log
+        error_log("AIPG OpenAI TTS: raw_model={$raw_model}, using={$model}");
+
+        // ... then continue with emotion tags + body:
         $text = $this->process_emotion_tags($text);
-        
+
         $body = array(
-            'model' => $model,
-            'input' => $text,
-            'voice' => $voice,
+            'model'           => $model,
+            'input'           => $text,
+            'voice'           => $voice,
             'response_format' => 'mp3',
         );
         
