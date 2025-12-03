@@ -256,6 +256,16 @@ class AIPG_OpenAI_TTS {
             return new WP_Error('no_valid_chunks', 'No valid audio chunks found');
         }
         
+        error_log('AIPG: Found ' . count($valid_chunks) . ' valid chunks, checking exec() availability...');
+        
+        // CRITICAL: Check exec() FIRST before attempting FFmpeg
+        if (!$this->is_exec_available()) {
+            error_log('AIPG: exec() not available, using PHP fallback immediately');
+            return $this->simple_merge_fallback($valid_chunks);
+        }
+        
+        error_log('AIPG: exec() is available, checking for FFmpeg...');
+        
         // Check if ffmpeg is available
         $ffmpeg_path = $this->is_ffmpeg_available();
         
@@ -282,7 +292,12 @@ class AIPG_OpenAI_TTS {
             $list_content .= "file '" . $chunk['file']['path'] . "'\n";
         }
         
-        file_put_contents($temp_list, $list_content);
+        $list_write = file_put_contents($temp_list, $list_content);
+        if ($list_write === false) {
+            error_log('AIPG: Failed to write temp list, using PHP fallback');
+            return $this->simple_merge_fallback($valid_chunks);
+        }
+        
         error_log('AIPG: Created temp list: ' . $temp_list);
         
         // Use ffmpeg with full path
@@ -295,20 +310,33 @@ class AIPG_OpenAI_TTS {
         
         error_log('AIPG: FFmpeg command: ' . $command);
         
+        // Execute with error handling
         $exec_output = array();
         $return_var = 0;
-        exec($command, $exec_output, $return_var);
         
-        error_log('AIPG: FFmpeg exit code: ' . $return_var);
-        if (!empty($exec_output)) {
-            error_log('AIPG: FFmpeg output: ' . implode("\n", $exec_output));
+        try {
+            // Attempt execution with @ to suppress warnings
+            @exec($command, $exec_output, $return_var);
+            
+            error_log('AIPG: FFmpeg exit code: ' . $return_var);
+            if (!empty($exec_output)) {
+                error_log('AIPG: FFmpeg output: ' . implode("\n", array_slice($exec_output, 0, 10))); // First 10 lines only
+            }
+        } catch (Exception $e) {
+            error_log('AIPG: FFmpeg execution exception: ' . $e->getMessage());
+            @unlink($temp_list);
+            return $this->simple_merge_fallback($valid_chunks);
         }
         
         // Clean up temp file
         @unlink($temp_list);
         
-        if ($return_var !== 0 || !file_exists($output_file)) {
-            error_log('AIPG: FFmpeg failed, using PHP fallback');
+        // Check if merge succeeded
+        if ($return_var !== 0 || !file_exists($output_file) || filesize($output_file) == 0) {
+            error_log('AIPG: FFmpeg failed (exit: ' . $return_var . ', exists: ' . (file_exists($output_file) ? 'yes' : 'no') . '), using PHP fallback');
+            if (file_exists($output_file)) {
+                @unlink($output_file);
+            }
             return $this->simple_merge_fallback($valid_chunks);
         }
         
@@ -323,38 +351,59 @@ class AIPG_OpenAI_TTS {
     }
     
     /**
-     * Simple fallback: use the last chunk or concatenate with PHP
+     * Simple fallback: concatenate with PHP
      */
     private function simple_merge_fallback($chunks) {
+        error_log('AIPG: Using PHP binary concatenation fallback');
+        
         $upload_dir = wp_upload_dir();
+        $podcast_dir = $upload_dir['basedir'] . '/ai-podcasts/';
+        
+        if (!file_exists($podcast_dir)) {
+            wp_mkdir_p($podcast_dir);
+        }
         
         // Try PHP binary concatenation
-        $output_file = $upload_dir['basedir'] . '/ai-podcasts/podcast_merged_' . uniqid() . '.mp3';
+        $output_file = $podcast_dir . 'podcast_merged_' . uniqid() . '.mp3';
         $merged_content = '';
+        $total_size = 0;
         
-        foreach ($chunks as $chunk) {
+        foreach ($chunks as $index => $chunk) {
             if (isset($chunk['file']['path']) && file_exists($chunk['file']['path'])) {
-                $merged_content .= file_get_contents($chunk['file']['path']);
+                $content = file_get_contents($chunk['file']['path']);
+                if ($content !== false) {
+                    $merged_content .= $content;
+                    $size = strlen($content);
+                    $total_size += $size;
+                    error_log('AIPG: Merged chunk ' . ($index + 1) . ': ' . $size . ' bytes');
+                } else {
+                    error_log('AIPG: Failed to read chunk: ' . basename($chunk['file']['path']));
+                }
             }
         }
         
         if (empty($merged_content)) {
+            error_log('AIPG: No content to merge, using first chunk as fallback');
             // Last resort: use the first available chunk
             foreach ($chunks as $chunk) {
                 if (isset($chunk['file']['path']) && file_exists($chunk['file']['path'])) {
+                    error_log('AIPG: Using first available chunk: ' . basename($chunk['file']['path']));
                     return $chunk['file'];
                 }
             }
             return new WP_Error('merge_failed', 'No valid audio chunks found');
         }
         
+        error_log('AIPG: Total merged size: ' . $total_size . ' bytes, writing to file...');
+        
         $result = file_put_contents($output_file, $merged_content);
         
         if ($result === false) {
-            // Use first chunk as fallback
-            error_log('AIPG: Binary merge failed, using first chunk');
+            error_log('AIPG: Binary merge write failed, using first chunk');
             return $chunks[0]['file'];
         }
+        
+        error_log('AIPG: PHP merge SUCCESS! Created: ' . basename($output_file) . ' (' . $result . ' bytes)');
         
         return array(
             'path' => $output_file,
@@ -364,18 +413,65 @@ class AIPG_OpenAI_TTS {
     }
     
     /**
+     * Check if exec() function is available
+     */
+    private function is_exec_available() {
+        // Check if function exists
+        if (!function_exists('exec')) {
+            error_log('AIPG: exec() function does not exist');
+            return false;
+        }
+        
+        // Check if it's in disable_functions
+        $disabled = ini_get('disable_functions');
+        if (!empty($disabled)) {
+            $disabled_funcs = array_map('trim', explode(',', $disabled));
+            if (in_array('exec', $disabled_funcs)) {
+                error_log('AIPG: exec() is in disable_functions: ' . $disabled);
+                return false;
+            }
+        }
+        
+        // Try a simple test
+        try {
+            $test_output = array();
+            $test_return = 999; // Default to error
+            @exec('echo test 2>&1', $test_output, $test_return);
+            
+            if ($test_return === 0 || !empty($test_output)) {
+                error_log('AIPG: exec() test successful');
+                return true;
+            } else {
+                error_log('AIPG: exec() test failed (return: ' . $test_return . ')');
+                return false;
+            }
+        } catch (Exception $e) {
+            error_log('AIPG: exec() test threw exception: ' . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
      * Check if ffmpeg is available
      */
     private function is_ffmpeg_available() {
+        // First check if exec() is available
+        if (!$this->is_exec_available()) {
+            error_log('AIPG: Cannot check for FFmpeg - exec() not available');
+            return false;
+        }
+        
         // Try multiple possible paths
         $paths = array('/bin/ffmpeg', '/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', 'ffmpeg');
         
         foreach ($paths as $path) {
             $output = array();
             $return_var = 0;
-            @exec($path . ' -version 2>&1', $output, $return_var);
             
-            if ($return_var === 0) {
+            // Use @ to suppress any warnings
+            $result = @exec($path . ' -version 2>&1', $output, $return_var);
+            
+            if ($return_var === 0 && !empty($result)) {
                 error_log('AIPG: FFmpeg found at: ' . $path);
                 return $path;
             }
