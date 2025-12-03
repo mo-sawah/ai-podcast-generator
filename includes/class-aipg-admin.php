@@ -180,6 +180,10 @@ class AIPG_Admin {
                                             <a href="<?php echo esc_url($gen->final_audio_url); ?>" target="_blank" class="button button-small">
                                                 <?php _e('Listen', 'ai-podcast-gen'); ?>
                                             </a>
+                                        <?php elseif (in_array($gen->status, array('failed', 'merging_audio', 'generating_audio'))): ?>
+                                            <button class="button button-small aipg-retry-btn" data-generation-id="<?php echo $gen->id; ?>">
+                                                <?php _e('Retry', 'ai-podcast-gen'); ?>
+                                            </button>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -399,6 +403,24 @@ class AIPG_Admin {
             echo '<div class="notice notice-success"><p>' . __('Settings saved!', 'ai-podcast-gen') . '</p></div>';
         }
         
+        // Check for database repair request
+        if (isset($_POST['aipg_repair_database'])) {
+            check_admin_referer('aipg_repair_db');
+            
+            $result = AIPG_Database::create_tables();
+            
+            if ($result) {
+                echo '<div class="notice notice-success"><p>' . __('Database table created successfully!', 'ai-podcast-gen') . '</p></div>';
+            } else {
+                echo '<div class="notice notice-error"><p>' . __('Failed to create database table. Check error logs.', 'ai-podcast-gen') . '</p></div>';
+            }
+        }
+        
+        // Check if database table exists
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'aipg_generations';
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+        
         $openrouter_key = get_option('aipg_openrouter_key', '');
         $openai_key = get_option('aipg_openai_key', '');
         $tavily_key = get_option('aipg_tavily_key', '');
@@ -408,6 +430,22 @@ class AIPG_Admin {
         ?>
         <div class="wrap aipg-wrap">
             <h1><?php _e('Podcast Generator Settings', 'ai-podcast-gen'); ?></h1>
+            
+            <?php if (!$table_exists): ?>
+            <div class="notice notice-error">
+                <p><strong><?php _e('Database Error:', 'ai-podcast-gen'); ?></strong> <?php _e('Required database table is missing!', 'ai-podcast-gen'); ?></p>
+                <form method="post" action="" style="display: inline;">
+                    <?php wp_nonce_field('aipg_repair_db'); ?>
+                    <button type="submit" name="aipg_repair_database" class="button button-primary">
+                        <?php _e('Create Database Table', 'ai-podcast-gen'); ?>
+                    </button>
+                </form>
+            </div>
+            <?php else: ?>
+            <div class="notice notice-success">
+                <p>✅ <?php _e('Database table exists and is ready.', 'ai-podcast-gen'); ?></p>
+            </div>
+            <?php endif; ?>
             
             <form method="post" action="">
                 <?php wp_nonce_field('aipg_settings'); ?>

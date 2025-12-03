@@ -13,6 +13,41 @@
             $('#' + tab + '-tab').addClass('active');
         });
         
+        // Retry generation button
+        $(document).on('click', '.aipg-retry-btn', function() {
+            const $btn = $(this);
+            const generationId = $btn.data('generation-id');
+            
+            if (!confirm('Retry this podcast generation?')) {
+                return;
+            }
+            
+            $btn.prop('disabled', true).text('Retrying...');
+            
+            $.ajax({
+                url: aipgAdmin.ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'aipg_retry_generation',
+                    nonce: aipgAdmin.nonce,
+                    generation_id: generationId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        alert('Generation restarted! Refresh the page in a few minutes to check status.');
+                        location.reload();
+                    } else {
+                        alert('Error: ' + response.data);
+                        $btn.prop('disabled', false).text('Retry');
+                    }
+                },
+                error: function() {
+                    alert('AJAX error occurred');
+                    $btn.prop('disabled', false).text('Retry');
+                }
+            });
+        });
+        
         // Manual generation form
         $('#aipg-generate-form').on('submit', function(e) {
             e.preventDefault();

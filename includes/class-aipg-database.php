@@ -27,11 +27,11 @@ class AIPG_Database {
         
         $sql = "CREATE TABLE IF NOT EXISTS $table_name (
             id bigint(20) NOT NULL AUTO_INCREMENT,
-            post_id bigint(20),
+            post_id bigint(20) DEFAULT NULL,
             status varchar(50) DEFAULT 'pending',
             script_data longtext,
             audio_chunks longtext,
-            final_audio_url varchar(500),
+            final_audio_url varchar(500) DEFAULT NULL,
             settings longtext,
             error_log longtext,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
@@ -42,10 +42,21 @@ class AIPG_Database {
         ) $charset_collate;";
         
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
+        $result = dbDelta($sql);
         
-        // Update version
-        update_option('aipg_db_version', AIPG_VERSION);
+        // Verify table was created
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+        
+        if ($table_exists) {
+            update_option('aipg_db_version', AIPG_VERSION);
+            error_log('AIPG: Database table created successfully - ' . $table_name);
+        } else {
+            error_log('AIPG: Failed to create database table - ' . $table_name);
+            error_log('AIPG SQL: ' . $sql);
+            error_log('AIPG dbDelta result: ' . print_r($result, true));
+        }
+        
+        return $table_exists;
     }
     
     /**

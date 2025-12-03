@@ -19,7 +19,38 @@ class AIPG_Generator {
     private function __construct() {
         add_action('wp_ajax_aipg_generate_manual', array($this, 'ajax_generate_manual'));
         add_action('wp_ajax_aipg_select_article', array($this, 'ajax_select_article'));
+        add_action('wp_ajax_aipg_retry_generation', array($this, 'ajax_retry_generation'));
         add_action('aipg_process_generation', array($this, 'process_generation'), 10, 1);
+    }
+    
+    /**
+     * AJAX: Retry failed generation
+     */
+    public function ajax_retry_generation() {
+        check_ajax_referer('aipg_generate', 'nonce');
+        
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Unauthorized');
+        }
+        
+        $generation_id = intval($_POST['generation_id'] ?? 0);
+        
+        if (!$generation_id) {
+            wp_send_json_error('Invalid generation ID');
+        }
+        
+        // Reset status and retry
+        AIPG_Database::update_generation($generation_id, array(
+            'status' => 'pending',
+            'error_log' => '',
+        ));
+        
+        // Re-queue the task
+        as_enqueue_async_action('aipg_process_generation', array($generation_id), 'aipg');
+        
+        wp_send_json_success(array(
+            'message' => 'Generation restarted',
+        ));
     }
     
     /**
@@ -169,11 +200,16 @@ class AIPG_Generator {
             // Step 4: Merge audio
             AIPG_Database::update_generation($generation_id, array('status' => 'merging_audio'));
             
+            error_log("AIPG Generation {$generation_id}: Starting audio merge with " . count($audio_chunks) . " chunks");
+            
             $final_audio = $tts->merge_audio_chunks($audio_chunks);
             
             if (is_wp_error($final_audio)) {
-                throw new Exception($final_audio->get_error_message());
+                error_log("AIPG Generation {$generation_id}: Audio merge failed - " . $final_audio->get_error_message());
+                throw new Exception('Audio merge failed: ' . $final_audio->get_error_message());
             }
+            
+            error_log("AIPG Generation {$generation_id}: Audio merged successfully - " . $final_audio['url']);
             
             // Step 5: Create podcast post
             $podcast_id = $this->create_podcast_post($post, $script_result, $final_audio, $settings);

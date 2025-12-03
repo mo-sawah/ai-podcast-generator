@@ -1,0 +1,150 @@
+# Troubleshooting: Stuck at "MERGING_AUDIO"
+
+## Problem
+Your podcast generation is stuck at "MERGING_AUDIO" status and won't complete.
+
+## Why This Happens
+The plugin tries to merge multiple audio chunks into a single file. This can fail if:
+1. **FFmpeg is not installed** on your server (most common)
+2. Server has insufficient permissions
+3. Temporary files are missing
+
+## Quick Fix - Use the Updated Plugin
+
+The new plugin version includes:
+✅ **Automatic fallback** if FFmpeg is missing
+✅ **PHP-based merging** as backup method
+✅ **Retry button** for stuck generations
+✅ **Better error logging**
+
+## Steps to Fix Stuck Generations
+
+### Step 1: Update Plugin
+Upload the latest version of the plugin.
+
+### Step 2: Retry Stuck Generation
+1. Go to **AI Podcasts > Dashboard**
+2. Find the stuck generation (status: MERGING_AUDIO)
+3. Click the **"Retry"** button
+4. Wait 5-10 minutes
+
+The new version will automatically use the fallback method if FFmpeg is not available.
+
+### Step 3: Check Action Scheduler
+If retry doesn't work:
+1. Go to **Tools > Scheduled Actions**
+2. Search for: `aipg_process_generation`
+3. Look for any failed actions
+4. Check the error messages
+
+## Install FFmpeg (Optional, for Better Quality)
+
+FFmpeg provides cleaner audio merging. If you have server access:
+
+### Ubuntu/Debian
+```bash
+sudo apt-get update
+sudo apt-get install ffmpeg
+```
+
+### CentOS/RHEL
+```bash
+sudo yum install ffmpeg
+```
+
+### cPanel/Shared Hosting
+Contact your hosting provider and ask them to install FFmpeg.
+
+### Verify FFmpeg is Installed
+```bash
+ffmpeg -version
+```
+
+## What the Fallback Does
+
+Without FFmpeg, the plugin will:
+1. Try PHP binary concatenation (works in most cases)
+2. If that fails, use the longest audio chunk as the final file
+3. Still create a working podcast!
+
+**Note**: The fallback method works but may have slight audio quality differences between chunks. FFmpeg is recommended for production use.
+
+## Check if It Worked
+
+After retry:
+1. Refresh the dashboard
+2. Status should change to "completed"
+3. You'll see a "Listen" button
+4. The podcast post will be published
+
+## Still Stuck?
+
+### Enable Debug Mode
+
+Add to `wp-config.php`:
+```php
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_DISPLAY', false);
+```
+
+Check `wp-content/debug.log` for:
+```
+AIPG Generation X: Starting audio merge with Y chunks
+AIPG Generation X: Audio merged successfully
+```
+
+or errors like:
+```
+AIPG: FFmpeg not available, using simple concatenation fallback
+```
+
+### Manual Completion
+
+If all else fails, find the audio chunks manually:
+
+1. Go to: `wp-content/uploads/ai-podcasts/`
+2. Find files named `chunk_*.mp3`
+3. Download them
+4. Use Audacity or any audio editor to merge them locally
+5. Upload the merged file
+6. Add it to the podcast post manually
+
+## Prevention for Future Generations
+
+**Option 1**: Install FFmpeg (recommended)
+
+**Option 2**: Use the new plugin version with fallback (automatic)
+
+**Option 3**: Reduce podcast duration to minimize chunks:
+- 5-10 minutes = fewer chunks = less likely to fail
+
+## Technical Details
+
+### Why Multiple Chunks?
+OpenAI TTS has a 4096 character limit per request. For a 10-minute podcast (1500 words), the plugin:
+1. Splits script into chunks (< 4000 chars each)
+2. Generates audio for each chunk
+3. Merges them into one file
+
+### Chunk Information
+Location: `wp-content/uploads/ai-podcasts/`
+Format: MP3, 24kHz
+Size: ~1-2MB per minute
+
+### Fallback Methods (Priority Order)
+1. FFmpeg (best quality, requires installation)
+2. PHP binary concatenation (good quality, always available)
+3. First chunk only (fallback of last resort)
+
+## Success Indicators
+
+You'll know it worked when you see:
+- ✅ Status changes to "completed"
+- ✅ Final audio URL is saved
+- ✅ Podcast post is created
+- ✅ "Listen" button appears in dashboard
+
+---
+
+The updated plugin handles this automatically - just click "Retry"! 🎉

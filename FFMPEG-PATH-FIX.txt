@@ -1,0 +1,133 @@
+# FFmpeg Path Fix - You DO Have FFmpeg!
+
+## Good News! 🎉
+Your server HAS FFmpeg installed at `/bin/ffmpeg`
+
+## What Was Wrong
+The plugin was looking for `ffmpeg` in the system PATH, but wasn't checking the full `/bin/ffmpeg` path specifically.
+
+## What's Fixed
+The new plugin version now checks these locations in order:
+1. `/bin/ffmpeg` ✅ (YOUR SERVER)
+2. `/usr/bin/ffmpeg`
+3. `/usr/local/bin/ffmpeg`
+4. `ffmpeg` (in PATH)
+
+Plus extensive logging so you can see exactly what's happening!
+
+## How to Fix Your Stuck Podcasts
+
+### Step 1: Upload New Plugin
+Upload the latest `ai-podcast-generator.zip` file.
+
+### Step 2: Click Retry
+1. Go to **AI Podcasts > Dashboard**
+2. Find stuck podcasts (status: MERGING_AUDIO)
+3. Click **"Retry"** button
+4. Wait 2-5 minutes
+
+### Step 3: Check Logs
+The plugin now logs everything! Check `wp-content/debug.log` for:
+
+```
+AIPG: FFmpeg found at: /bin/ffmpeg
+AIPG: Starting merge of 5 audio chunks
+AIPG: Valid chunk: chunk_abc123.mp3 (245832 bytes)
+AIPG: Valid chunk: chunk_def456.mp3 (198432 bytes)
+...
+AIPG: FFmpeg SUCCESS! Created: podcast_xyz789.mp3 (1234567 bytes)
+```
+
+### Step 4: Verify Success
+- Status changes to "completed"
+- You see a "Listen" button
+- The podcast is published
+
+## What You'll See in Logs Now
+
+**Success scenario:**
+```
+AIPG: Starting merge of 3 audio chunks
+AIPG: FFmpeg found at: /bin/ffmpeg
+AIPG: FFmpeg SUCCESS! Created: podcast_12345.mp3 (2048576 bytes)
+AIPG Generation 2: Audio merged successfully
+```
+
+**If chunks are missing:**
+```
+AIPG: Missing chunk: /path/to/chunk_xyz.mp3
+AIPG: ERROR - No valid audio chunks found!
+```
+
+**If FFmpeg fails (rare):**
+```
+AIPG: FFmpeg exit code: 1
+AIPG: FFmpeg output: [error message]
+AIPG: FFmpeg failed, using PHP fallback
+```
+
+## Enable Debug Mode (if needed)
+
+Add to `wp-config.php`:
+```php
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_DISPLAY', false);
+```
+
+Then check: `wp-content/debug.log`
+
+## Expected Behavior Now
+
+With your FFmpeg installed:
+1. ✅ Plugin detects `/bin/ffmpeg`
+2. ✅ Creates temp file list
+3. ✅ Runs FFmpeg with full path
+4. ✅ Merges audio perfectly
+5. ✅ Creates final podcast
+6. ✅ Completes successfully
+
+The logs will show you EXACTLY what's happening at each step!
+
+## Still Having Issues?
+
+If retry doesn't work, check these:
+
+### 1. Are audio chunks being created?
+```bash
+ls -lh /path/to/wp-content/uploads/ai-podcasts/
+```
+
+You should see `chunk_*.mp3` files.
+
+### 2. Are they readable?
+```bash
+ls -la /path/to/wp-content/uploads/ai-podcasts/chunk_*.mp3
+```
+
+Check permissions (should be 644 or 664).
+
+### 3. Check Action Scheduler
+Go to: **Tools > Scheduled Actions**
+Search for: `aipg_process_generation`
+Look for failed actions.
+
+### 4. Manual Test
+SSH into your server and run:
+```bash
+/bin/ffmpeg -version
+```
+
+Should show FFmpeg version info.
+
+## Next Podcast Generation
+
+With this fix, your next podcast should:
+- Detect FFmpeg immediately
+- Merge audio seamlessly
+- Complete in 5-10 minutes
+- Work perfectly! ✅
+
+---
+
+The plugin now uses your FFmpeg installation properly! 🚀

@@ -3,7 +3,7 @@
  * Plugin Name: AI Podcast Generator
  * Plugin URI: https://sawahsolutions.com
  * Description: Generate AI-powered podcasts with multiple hosts using OpenRouter and ChatGPT TTS
- * Version: 1.0.0
+ * Version: 1.0.2
  * Author: Mohamed Sawah
  * Author URI: https://sawahsolutions.com
  * License: GPL v2 or later
@@ -14,7 +14,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('AIPG_VERSION', '1.0.0');
+define('AIPG_VERSION', '1.0.2');
 define('AIPG_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AIPG_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('AIPG_PLUGIN_FILE', __FILE__);
@@ -61,8 +61,26 @@ class AI_Podcast_Generator {
         // Load dependencies
         $this->load_dependencies();
         
+        // Check if database table exists, create if not
+        $this->check_database();
+        
         // Initialize components
         $this->init_components();
+    }
+    
+    /**
+     * Check and create database if needed
+     */
+    private function check_database() {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'aipg_generations';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+        
+        if (!$table_exists) {
+            AIPG_Database::create_tables();
+        }
     }
     
     private function load_dependencies() {
@@ -119,9 +137,17 @@ class AI_Podcast_Generator {
         require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-database.php';
         require_once AIPG_PLUGIN_DIR . 'includes/class-aipg-cpt.php';
         
+        // Create database tables
         AIPG_Database::create_tables();
+        
+        // Register post type
         AIPG_CPT::register_post_type();
+        
+        // Flush rewrite rules
         flush_rewrite_rules();
+        
+        // Set activation flag to check database
+        update_option('aipg_activated', time());
     }
     
     public function deactivate() {
