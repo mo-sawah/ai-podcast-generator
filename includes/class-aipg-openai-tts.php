@@ -192,17 +192,34 @@ class AIPG_OpenAI_TTS {
         $current_voice = null;
         $current_speaker = null;
         $chunk_index = 0;
+        $max_chunks = 500; // Safety limit to prevent infinite loops
         
         $language = $settings['language'] ?? 'English';
         
-        foreach ($parsed_script as $line) {
+        error_log("AIPG TTS: Processing " . count($parsed_script) . " script segments");
+        
+        foreach ($parsed_script as $segment_index => $line) {
+            // Safety check for infinite loops
+            if ($chunk_index >= $max_chunks) {
+                error_log("AIPG TTS: ⚠ WARNING - Reached maximum chunk limit ({$max_chunks}), stopping");
+                break;
+            }
+            
             $speaker = trim($line['speaker']);
             $text = $this->process_emotion_tags($line['text']);
+            
+            // Skip empty text
+            if (empty($text)) {
+                continue;
+            }
             
             // Get voice for this speaker
             $voice = $this->get_voice_for_speaker($speaker, $settings['voice_mapping']);
             
-            error_log("AIPG TTS: Segment - Speaker: {$speaker}, Voice: {$voice}, Language: {$language}");
+            // Log progress every 10 segments
+            if ($segment_index % 10 === 0) {
+                error_log("AIPG TTS: Processing segment {$segment_index}/" . count($parsed_script) . " - Speaker: {$speaker}, Voice: {$voice}");
+            }
             
             // If voice changes or chunk would exceed limit, generate current chunk
             if ($current_voice && ($voice !== $current_voice || strlen($current_chunk . ' ' . $text) > $this->chunk_limit)) {
@@ -222,7 +239,9 @@ class AIPG_OpenAI_TTS {
                     'language' => $language,
                 );
                 
-                error_log("AIPG TTS: ✓ Generated chunk {$chunk_index} - {$current_speaker} ({$current_voice}) in {$language}");
+                if ($chunk_index % 5 === 0) {
+                    error_log("AIPG TTS: ✓ Generated chunk {$chunk_index} - {$current_speaker} ({$current_voice})");
+                }
                 
                 // Reset chunk
                 $current_chunk = $text;
@@ -254,50 +273,104 @@ class AIPG_OpenAI_TTS {
                     'language' => $language,
                 );
                 
-                error_log("AIPG TTS: ✓ Generated final chunk - {$current_speaker} ({$current_voice}) in {$language}");
+                error_log("AIPG TTS: ✓ Generated final chunk {$chunk_index} - {$current_speaker} ({$current_voice})");
             }
         }
+        
+        error_log("AIPG TTS: Completed audio generation - Total chunks: " . count($audio_chunks));
         
         return $audio_chunks;
     }
     
     /**
-     * FIXED: Get voice for speaker with better matching
+     * FIXED: Get voice for speaker with GREEK UNICODE support
      */
     private function get_voice_for_speaker($speaker, $voice_mapping) {
         $speaker = trim($speaker);
         
-        // Log for debugging
-        error_log("AIPG TTS: Looking up voice for speaker: '{$speaker}'");
-        error_log("AIPG TTS: Available mappings: " . json_encode(array_keys($voice_mapping)));
+        // Normalize speaker name for Greek characters
+        $normalized_speaker = $this->normalize_speaker_name($speaker);
         
-        // Direct exact match (case-sensitive)
+        // Log for debugging (only log every 10th lookup to avoid spam)
+        static $lookup_count = 0;
+        $lookup_count++;
+        if ($lookup_count % 10 === 1) {
+            error_log("AIPG TTS: Looking up voice for speaker: '{$speaker}' (normalized: '{$normalized_speaker}')");
+        }
+        
+        // Build normalized mapping cache
+        static $normalized_cache = null;
+        if ($normalized_cache === null) {
+            $normalized_cache = array();
+            foreach ($voice_mapping as $mapped_speaker => $voice) {
+                $normalized_mapped = $this->normalize_speaker_name($mapped_speaker);
+                $normalized_cache[$normalized_mapped] = $voice;
+                
+                // Also cache original for direct match
+                $normalized_cache[$mapped_speaker] = $voice;
+            }
+            error_log("AIPG TTS: Voice mapping cache built with " . count($normalized_cache) . " entries");
+        }
+        
+        // 1. Try normalized match
+        if (isset($normalized_cache[$normalized_speaker])) {
+            return $normalized_cache[$normalized_speaker];
+        }
+        
+        // 2. Try direct original match
         if (isset($voice_mapping[$speaker])) {
-            error_log("AIPG TTS: ✓ Direct match found: " . $voice_mapping[$speaker]);
             return $voice_mapping[$speaker];
         }
         
-        // Case-insensitive match
+        // 3. Try case-insensitive match
         foreach ($voice_mapping as $mapped_speaker => $voice) {
-            if (strcasecmp($speaker, $mapped_speaker) === 0) {
-                error_log("AIPG TTS: ✓ Case-insensitive match: {$mapped_speaker} -> {$voice}");
+            if (mb_strtolower($speaker, 'UTF-8') === mb_strtolower($mapped_speaker, 'UTF-8')) {
                 return $voice;
             }
         }
         
-        // Try partial match (e.g., "Alex" in "Alex (Host 1)")
+        // 4. Try partial match
         foreach ($voice_mapping as $mapped_speaker => $voice) {
-            if (stripos($speaker, $mapped_speaker) !== false || stripos($mapped_speaker, $speaker) !== false) {
-                error_log("AIPG TTS: ✓ Partial match: {$mapped_speaker} -> {$voice}");
+            $speaker_lower = mb_strtolower($speaker, 'UTF-8');
+            $mapped_lower = mb_strtolower($mapped_speaker, 'UTF-8');
+            
+            if (mb_strpos($speaker_lower, $mapped_lower) !== false || 
+                mb_strpos($mapped_lower, $speaker_lower) !== false) {
                 return $voice;
             }
         }
         
         // Fallback: use first voice in mapping
         $fallback_voice = !empty($voice_mapping) ? reset($voice_mapping) : 'alloy';
-        error_log("AIPG TTS: ⚠ No match found, using fallback: {$fallback_voice}");
+        
+        if ($lookup_count % 10 === 1) {
+            error_log("AIPG TTS: ⚠ No match found for '{$speaker}', using fallback: {$fallback_voice}");
+        }
         
         return $fallback_voice;
+    }
+    
+    /**
+     * Normalize speaker names for Greek Unicode matching
+     */
+    private function normalize_speaker_name($name) {
+        $name = trim($name);
+        
+        // Remove emotion tags
+        $name = preg_replace('/\s*\[.*?\]\s*/', '', $name);
+        
+        // Normalize Unicode (NFC form)
+        if (class_exists('Normalizer')) {
+            $name = Normalizer::normalize($name, Normalizer::FORM_C);
+        }
+        
+        // Convert to lowercase for case-insensitive matching
+        $name = mb_strtolower($name, 'UTF-8');
+        
+        // Remove extra whitespace
+        $name = preg_replace('/\s+/', ' ', $name);
+        
+        return $name;
     }
     
     /**

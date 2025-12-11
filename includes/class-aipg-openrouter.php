@@ -485,17 +485,30 @@ These work in any language - add them before dialogue to guide the voice deliver
         $script_lines = explode("\n", $script_text);
         $parsed_script = array();
         
+        // Build a normalized name lookup for voice mapping
+        $name_lookup = array();
+        if (!empty($settings['voice_mapping'])) {
+            foreach ($settings['voice_mapping'] as $mapped_name => $voice) {
+                $normalized = mb_strtolower(trim($mapped_name), 'UTF-8');
+                $name_lookup[$normalized] = $mapped_name; // Store original casing
+            }
+        }
+        
         foreach ($script_lines as $line) {
             $line = trim($line);
             if (empty($line)) continue;
             
             // Match format: SPEAKER: [emotion] dialogue or SPEAKER: dialogue
-            if (preg_match('/^([^:]+):\s*(\[(\w+)\])?\s*(.+)$/i', $line, $matches)) {
-                $speaker = trim($matches[1]);
+            if (preg_match('/^([^:]+):\s*(\[(\w+)\])?\s*(.+)$/u', $line, $matches)) {
+                $speaker_raw = trim($matches[1]);
                 $emotion = !empty($matches[3]) ? trim($matches[3]) : '';
                 $text = trim($matches[4]);
                 
                 if (strlen($text) < 5) continue;
+                
+                // Normalize speaker name to match voice mapping
+                $speaker_normalized = mb_strtolower($speaker_raw, 'UTF-8');
+                $speaker = $name_lookup[$speaker_normalized] ?? $speaker_raw;
                 
                 $parsed_script[] = array(
                     'speaker' => $speaker,
