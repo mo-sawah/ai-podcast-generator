@@ -79,12 +79,19 @@ class AIPG_OpenRouter {
         
         $settings = wp_parse_args($settings, $defaults);
         
+        // CRITICAL: Clean article content to fix any UTF-8 encoding issues
+        $article_content = $this->clean_utf8($article_content);
+        if (!empty($settings['search_data'])) {
+            $settings['search_data'] = $this->clean_utf8($settings['search_data']);
+        }
+        
         $language = $settings['language'];
         $lang_info = $this->supported_languages[$language] ?? $this->supported_languages['English'];
         
         error_log('AIPG: Starting multilingual script generation');
         error_log('AIPG: Language: ' . $language . ' (' . $lang_info['native'] . ')');
         error_log('AIPG: Duration: ' . $settings['duration'] . ' minutes');
+        error_log('AIPG: Article length: ' . strlen($article_content) . ' bytes');
         
         // Get website info for branding
         $site_name = get_bloginfo('name');
@@ -618,10 +625,35 @@ Write the summary now:";
     }
     
     /**
+     * Clean and fix UTF-8 encoding issues
+     */
+    private function clean_utf8($text) {
+        if (empty($text)) {
+            return $text;
+        }
+        
+        // Remove any non-UTF-8 characters
+        $text = mb_convert_encoding($text, 'UTF-8', 'UTF-8');
+        
+        // Remove any remaining invalid UTF-8 sequences
+        $text = iconv('UTF-8', 'UTF-8//IGNORE', $text);
+        
+        // Normalize Unicode characters (e.g., combining accents)
+        if (class_exists('Normalizer')) {
+            $text = Normalizer::normalize($text, Normalizer::FORM_C);
+        }
+        
+        return $text;
+    }
+    
+    /**
      * Chat completion API call with UTF-8 support for Greek and other languages
      */
     public function chat_completion($prompt, $model = 'openai/gpt-4o-mini', $max_tokens = 4000) {
         $endpoint = $this->base_url . '/chat/completions';
+        
+        // Clean the prompt to ensure valid UTF-8
+        $prompt = $this->clean_utf8($prompt);
         
         $body = array(
             'model' => $model,
@@ -636,12 +668,14 @@ Write the summary now:";
         );
         
         // Encode with JSON_UNESCAPED_UNICODE to support Greek and other Unicode characters
-        $json_body = json_encode($body, JSON_UNESCAPED_UNICODE);
+        $json_body = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         
         // Check if encoding failed
         if ($json_body === false) {
             $error = json_last_error_msg();
             error_log('AIPG: JSON encoding failed - ' . $error);
+            error_log('AIPG: Prompt length: ' . strlen($prompt) . ' bytes');
+            error_log('AIPG: Prompt sample: ' . substr($prompt, 0, 200));
             return new WP_Error('json_encode_error', 'Failed to encode request: ' . $error);
         }
         
