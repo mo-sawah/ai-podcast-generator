@@ -582,160 +582,86 @@ class AIPG_ElevenLabs_TTS {
     }
     
     /**
-     * Merge audio chunks into final file
+     * ROBUST STREAM MERGE - Low Memory & Safe
      */
-    public function merge_audio_chunks($audio_chunks) {
-        if (empty($audio_chunks)) {
+    public function merge_audio_chunks($chunks) {
+        if (empty($chunks)) {
             return new WP_Error('no_chunks', 'No audio chunks to merge');
         }
         
-        error_log('AIPG ElevenLabs: Starting merge of ' . count($audio_chunks) . ' chunks');
-        
+        // 1. Setup paths
         $upload_dir = wp_upload_dir();
-        $podcast_dir = $upload_dir['basedir'] . '/aipg-podcasts';
+        $base_dir = $upload_dir['basedir'] . '/ai-podcasts/';
         
-        // Create directory if needed
-        if (!file_exists($podcast_dir)) {
-            wp_mkdir_p($podcast_dir);
+        if (!file_exists($base_dir)) {
+            wp_mkdir_p($base_dir);
+        }
+
+        $output_filename = 'podcast_merged_' . uniqid() . '.mp3';
+        $output_path = $base_dir . $output_filename;
+        $output_url  = $upload_dir['baseurl'] . '/ai-podcasts/' . $output_filename;
+        
+        error_log('AIPG Merge: Starting safe stream merge for ' . count($chunks) . ' chunks');
+
+        // 2. Open output file for writing (Binary Mode)
+        $output_handle = @fopen($output_path, 'wb');
+        if ($output_handle === false) {
+            error_log('AIPG Merge: Failed to open output file for writing: ' . $output_path);
+            return new WP_Error('write_error', 'Could not create output file. Check permissions.');
         }
         
-        $final_file = $podcast_dir . '/podcast-' . uniqid() . '.mp3';
+        // 3. Loop through chunks and stream them into the output file
+        $total_bytes = 0;
         
-        // If only one chunk, just copy it
-        if (count($audio_chunks) === 1) {
-            if (file_exists($audio_chunks[0]['file'])) {
-                copy($audio_chunks[0]['file'], $final_file);
-                @unlink($audio_chunks[0]['file']);
-                error_log('AIPG ElevenLabs: Single chunk, copied directly');
-                return $upload_dir['baseurl'] . '/aipg-podcasts/' . basename($final_file);
-            }
-        }
-        
-        // Check if ffmpeg is available
-        exec('which ffmpeg 2>&1', $output, $return_code);
-        
-        if ($return_code !== 0) {
-            // Try common paths
-            $ffmpeg_paths = array('/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', 'ffmpeg');
-            $ffmpeg = null;
+        foreach ($chunks as $index => $chunk) {
+            $file_path = $chunk['file']['path'] ?? '';
             
-            foreach ($ffmpeg_paths as $path) {
-                exec("$path -version 2>&1", $test_output, $test_code);
-                if ($test_code === 0) {
-                    $ffmpeg = $path;
-                    break;
-                }
+            if (empty($file_path) || !file_exists($file_path)) {
+                error_log("AIPG Merge: Warning - Chunk $index file missing at: $file_path");
+                continue;
             }
             
-            if (!$ffmpeg) {
-                error_log('AIPG ElevenLabs: FFmpeg not found');
-                return new WP_Error('no_ffmpeg', 'FFmpeg not installed. Please install: apt-get install ffmpeg');
+            // Open input chunk for reading
+            $input_handle = @fopen($file_path, 'rb');
+            if ($input_handle === false) {
+                error_log("AIPG Merge: Could not read chunk $index");
+                continue;
             }
-        } else {
-            $ffmpeg = 'ffmpeg';
-        }
-        
-        error_log('AIPG ElevenLabs: Using ffmpeg: ' . $ffmpeg);
-        
-        // Create list of files to merge
-        $files_list = array();
-        foreach ($audio_chunks as $chunk) {
-            if (file_exists($chunk['file'])) {
-                $files_list[] = $chunk['file'];
-                error_log('AIPG ElevenLabs: Adding to merge: ' . basename($chunk['file']) . ' (' . filesize($chunk['file']) . ' bytes)');
-            } else {
-                error_log('AIPG ElevenLabs: WARNING - Missing chunk file: ' . $chunk['file']);
+            
+            // Read and write in small 8KB buffers (Keeps RAM usage extremely low)
+            while (!feof($input_handle)) {
+                $buffer = fread($input_handle, 8192); // Read 8KB
+                fwrite($output_handle, $buffer);      // Write 8KB
+            }
+            
+            // Close input file
+            fclose($input_handle);
+            
+            // Calculate size for logging
+            $filesize = filesize($file_path);
+            $total_bytes += $filesize;
+            
+            // Log progress occasionally to keep connection alive
+            if ($index % 5 === 0) {
+                error_log("AIPG Merge: Merged $index chunks...");
             }
         }
         
-        if (empty($files_list)) {
-            return new WP_Error('no_files', 'No audio files found to merge');
+        // 4. Close output file
+        fclose($output_handle);
+        
+        // Verify success
+        if (!file_exists($output_path) || filesize($output_path) === 0) {
+            error_log('AIPG Merge: Failed - Output file is empty');
+            return new WP_Error('merge_failed', 'Merged file is empty');
         }
         
-        // Method 1: Try concat demuxer (fastest)
-        $temp_dir = $upload_dir['basedir'] . '/aipg-temp';
-        if (!file_exists($temp_dir)) {
-            wp_mkdir_p($temp_dir);
-        }
+        error_log("AIPG Merge: Success! Created $output_filename ($total_bytes bytes)");
         
-        $concat_file = $temp_dir . '/concat-' . uniqid() . '.txt';
-        $concat_content = '';
-        
-        foreach ($files_list as $file) {
-            // Use absolute path and escape single quotes
-            $safe_path = str_replace("'", "'\\''", $file);
-            $concat_content .= "file '$safe_path'\n";
-        }
-        
-        file_put_contents($concat_file, $concat_content);
-        
-        error_log('AIPG ElevenLabs: Concat file created: ' . $concat_file);
-        error_log('AIPG ElevenLabs: Concat content: ' . $concat_content);
-        
-        $command = sprintf(
-            '%s -f concat -safe 0 -i %s -c copy %s 2>&1',
-            $ffmpeg,
-            escapeshellarg($concat_file),
-            escapeshellarg($final_file)
+        return array(
+            'path' => $output_path,
+            'url'  => $output_url,
+            'size' => $total_bytes
         );
-        
-        error_log('AIPG ElevenLabs: Running command: ' . $command);
-        
-        exec($command, $output, $return_code);
-        
-        error_log('AIPG ElevenLabs: FFmpeg output: ' . implode("\n", $output));
-        error_log('AIPG ElevenLabs: FFmpeg return code: ' . $return_code);
-        
-        // Clean up
-        @unlink($concat_file);
-        
-        // Check if merge succeeded
-        if ($return_code !== 0 || !file_exists($final_file) || filesize($final_file) < 1000) {
-            error_log('AIPG ElevenLabs: Concat method failed, trying alternative...');
-            
-            // Method 2: Re-encode all files (slower but more compatible)
-            $input_args = '';
-            foreach ($files_list as $file) {
-                $input_args .= '-i ' . escapeshellarg($file) . ' ';
-            }
-            
-            $filter_complex = '';
-            for ($i = 0; $i < count($files_list); $i++) {
-                $filter_complex .= "[$i:a]";
-            }
-            $filter_complex .= "concat=n=" . count($files_list) . ":v=0:a=1[outa]";
-            
-            $command = sprintf(
-                '%s %s -filter_complex "%s" -map "[outa]" %s 2>&1',
-                $ffmpeg,
-                $input_args,
-                $filter_complex,
-                escapeshellarg($final_file)
-            );
-            
-            error_log('AIPG ElevenLabs: Trying alternative merge: ' . $command);
-            
-            exec($command, $output2, $return_code2);
-            
-            error_log('AIPG ElevenLabs: Alternative FFmpeg output: ' . implode("\n", $output2));
-            
-            if ($return_code2 !== 0 || !file_exists($final_file)) {
-                // Clean up temp files
-                foreach ($files_list as $file) {
-                    @unlink($file);
-                }
-                return new WP_Error('merge_failed', 'FFmpeg merge failed. Output: ' . implode("\n", array_merge($output, $output2)));
-            }
-        }
-        
-        // Clean up temporary chunk files
-        foreach ($files_list as $file) {
-            @unlink($file);
-        }
-        
-        $final_size = filesize($final_file);
-        error_log('AIPG ElevenLabs: Successfully merged audio: ' . $final_file . ' (' . $final_size . ' bytes)');
-        
-        return $upload_dir['baseurl'] . '/aipg-podcasts/' . basename($final_file);
     }
 }

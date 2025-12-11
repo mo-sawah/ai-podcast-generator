@@ -304,40 +304,87 @@ class AIPG_OpenAI_TTS {
     }
     
     /**
-     * IMPROVED: Merge audio chunks with better FFmpeg detection
+     * ROBUST STREAM MERGE - Low Memory & Safe
      */
     public function merge_audio_chunks($chunks) {
         if (empty($chunks)) {
             return new WP_Error('no_chunks', 'No audio chunks to merge');
         }
         
-        if (count($chunks) === 1) {
-            error_log('AIPG: Only 1 chunk, returning directly');
-            return $chunks[0]['file'];
+        // 1. Setup paths
+        $upload_dir = wp_upload_dir();
+        $base_dir = $upload_dir['basedir'] . '/ai-podcasts/';
+        
+        if (!file_exists($base_dir)) {
+            wp_mkdir_p($base_dir);
+        }
+
+        $output_filename = 'podcast_merged_' . uniqid() . '.mp3';
+        $output_path = $base_dir . $output_filename;
+        $output_url  = $upload_dir['baseurl'] . '/ai-podcasts/' . $output_filename;
+        
+        error_log('AIPG Merge: Starting safe stream merge for ' . count($chunks) . ' chunks');
+
+        // 2. Open output file for writing (Binary Mode)
+        $output_handle = @fopen($output_path, 'wb');
+        if ($output_handle === false) {
+            error_log('AIPG Merge: Failed to open output file for writing: ' . $output_path);
+            return new WP_Error('write_error', 'Could not create output file. Check permissions.');
         }
         
-        error_log('AIPG: ===== MERGING ' . count($chunks) . ' CHUNKS =====');
+        // 3. Loop through chunks and stream them into the output file
+        $total_bytes = 0;
         
-        // Try FFmpeg first
-        $ffmpeg_path = $this->find_ffmpeg();
-        
-        if ($ffmpeg_path && $this->is_exec_available()) {
-            error_log('AIPG: Attempting FFmpeg merge with: ' . $ffmpeg_path);
-            $result = $this->ffmpeg_merge($chunks, $ffmpeg_path);
+        foreach ($chunks as $index => $chunk) {
+            $file_path = $chunk['file']['path'] ?? '';
             
-            if (!is_wp_error($result)) {
-                error_log('AIPG: ✓ FFmpeg merge successful');
-                return $result;
+            if (empty($file_path) || !file_exists($file_path)) {
+                error_log("AIPG Merge: Warning - Chunk $index file missing at: $file_path");
+                continue;
             }
             
-            error_log('AIPG: FFmpeg merge failed: ' . $result->get_error_message());
-        } else {
-            error_log('AIPG: FFmpeg not available, exec disabled, or not found');
+            // Open input chunk for reading
+            $input_handle = @fopen($file_path, 'rb');
+            if ($input_handle === false) {
+                error_log("AIPG Merge: Could not read chunk $index");
+                continue;
+            }
+            
+            // Read and write in small 8KB buffers (Keeps RAM usage extremely low)
+            while (!feof($input_handle)) {
+                $buffer = fread($input_handle, 8192); // Read 8KB
+                fwrite($output_handle, $buffer);      // Write 8KB
+            }
+            
+            // Close input file
+            fclose($input_handle);
+            
+            // Calculate size for logging
+            $filesize = filesize($file_path);
+            $total_bytes += $filesize;
+            
+            // Log progress occasionally to keep connection alive
+            if ($index % 5 === 0) {
+                error_log("AIPG Merge: Merged $index chunks...");
+            }
         }
         
-        // Fallback to PHP concatenation
-        error_log('AIPG: Using PHP concatenation fallback');
-        return $this->simple_merge_fallback($chunks);
+        // 4. Close output file
+        fclose($output_handle);
+        
+        // Verify success
+        if (!file_exists($output_path) || filesize($output_path) === 0) {
+            error_log('AIPG Merge: Failed - Output file is empty');
+            return new WP_Error('merge_failed', 'Merged file is empty');
+        }
+        
+        error_log("AIPG Merge: Success! Created $output_filename ($total_bytes bytes)");
+        
+        return array(
+            'path' => $output_path,
+            'url'  => $output_url,
+            'size' => $total_bytes
+        );
     }
     
     /**

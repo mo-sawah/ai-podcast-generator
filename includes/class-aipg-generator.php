@@ -230,8 +230,14 @@ class AIPG_Generator {
             $settings = $generation->settings;
             $settings['search_data'] = $search_data;
             
+            // FIX: Create separate settings for the script to avoid sending TTS model 'tts-1' to OpenRouter
+            $script_settings = $settings;
+            // Force a valid text model for the script writing (using GPT-4o Mini or similar)
+            $script_settings['model'] = 'openai/gpt-4o-mini'; 
+            
             $openrouter = new AIPG_OpenRouter();
-            $script_result = $openrouter->generate_script($article_content, $settings);
+            // We pass $script_settings instead of $settings here
+            $script_result = $openrouter->generate_script($article_content, $script_settings);
             
             if (is_wp_error($script_result)) {
                 throw new Exception($script_result->get_error_message());
