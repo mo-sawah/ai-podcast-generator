@@ -3,7 +3,7 @@
  * Plugin Name: AI Podcast Generator
  * Plugin URI: https://sawahsolutions.com
  * Description: Generate AI-powered podcasts with multiple hosts using OpenRouter and ChatGPT TTS
- * Version: 1.0.20
+ * Version: 1.0.21
  * Author: Mohamed Sawah
  * Author URI: https://sawahsolutions.com
  * License: GPL v2 or later
@@ -14,7 +14,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('AIPG_VERSION', '1.0.20');
+define('AIPG_VERSION', '1.0.21');
 define('AIPG_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AIPG_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('AIPG_PLUGIN_FILE', __FILE__);

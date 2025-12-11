@@ -618,7 +618,7 @@ Write the summary now:";
     }
     
     /**
-     * Chat completion API call
+     * Chat completion API call with UTF-8 support for Greek and other languages
      */
     public function chat_completion($prompt, $model = 'openai/gpt-4o-mini', $max_tokens = 4000) {
         $endpoint = $this->base_url . '/chat/completions';
@@ -635,14 +635,24 @@ Write the summary now:";
             'temperature' => 0.7,
         );
         
+        // Encode with JSON_UNESCAPED_UNICODE to support Greek and other Unicode characters
+        $json_body = json_encode($body, JSON_UNESCAPED_UNICODE);
+        
+        // Check if encoding failed
+        if ($json_body === false) {
+            $error = json_last_error_msg();
+            error_log('AIPG: JSON encoding failed - ' . $error);
+            return new WP_Error('json_encode_error', 'Failed to encode request: ' . $error);
+        }
+        
         $response = wp_remote_post($endpoint, array(
             'headers' => array(
                 'Authorization' => 'Bearer ' . $this->api_key,
-                'Content-Type' => 'application/json',
+                'Content-Type' => 'application/json; charset=utf-8',
                 'HTTP-Referer' => home_url(),
                 'X-Title' => get_bloginfo('name')
             ),
-            'body' => json_encode($body),
+            'body' => $json_body,
             'timeout' => 120,
         ));
         
