@@ -1,6 +1,6 @@
 /**
- * AI Podcast Generator - Professional Admin Script
- * Handles form submission, voice preview, and dynamic UI
+ * AI Podcast Generator - FIXED Admin Script
+ * Improved voice mapping and form submission
  */
 
 (function ($) {
@@ -12,11 +12,7 @@
     // TTS Provider Switcher
     $("#aipg_tts_provider").on("change", function () {
       const provider = $(this).val();
-
-      // Hide all provider settings
       $(".aipg-provider-settings").hide();
-
-      // Show selected provider settings
       if (provider === "elevenlabs") {
         $(".aipg-elevenlabs-settings").show();
       } else {
@@ -24,7 +20,7 @@
       }
     });
 
-    // TTS Model Test Button
+    // TTS Model Test
     $("#aipg-test-tts").on("click", function () {
       const $btn = $(this);
       const $results = $("#aipg-tts-test-results");
@@ -54,17 +50,15 @@
             const results = response.data.results;
 
             if (provider === "elevenlabs") {
-              // ElevenLabs test results
               let html =
                 '<div class="aipg-tts-test-results" style="border-left: 4px solid #7d5fff; padding-left: 15px; margin-top: 10px;">';
-
               if (results[0].success) {
                 html +=
                   '<p style="color: #28a745; margin: 8px 0; font-weight: 500;"><strong>✅ ElevenLabs API:</strong> ' +
                   results[0].message +
                   "</p>";
                 html +=
-                  '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>✓ Connected successfully! Model: ' +
+                  '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>✓ Connected! Model: ' +
                   results[0].model +
                   "</em></p>";
               } else {
@@ -72,67 +66,40 @@
                   '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ ElevenLabs API:</strong> ' +
                   results[0].message +
                   "</p>";
-                html +=
-                  '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><strong>⚠️ Problem:</strong><br>';
-                html += "1. Check your ElevenLabs API key<br>";
-                html +=
-                  '2. Get a new key at <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">elevenlabs.io/app/settings/api-keys</a><br>';
-                html += "3. Make sure you have credits in your account</p>";
               }
-
               html += "</div>";
               $results.html(html);
             } else {
-              // OpenAI test results
               let html =
                 '<div class="aipg-tts-test-results" style="border-left: 4px solid #7d5fff; padding-left: 15px; margin-top: 10px;">';
-
-              // Test tts-1 (Standard)
               if (results["tts-1"]) {
                 const test = results["tts-1"];
                 if (test.success) {
                   html +=
-                    '<p style="color: #28a745; margin: 8px 0; font-weight: 500;"><strong>✅ Standard Quality (tts-1):</strong> ' +
+                    '<p style="color: #28a745; margin: 8px 0; font-weight: 500;"><strong>✅ Standard (tts-1):</strong> ' +
                     test.message +
                     "</p>";
-                  html +=
-                    '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>✓ Works with ALL API keys!</em></p>';
                 } else {
                   html +=
-                    '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ Standard Quality (tts-1):</strong> ' +
+                    '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ Standard (tts-1):</strong> ' +
                     test.error +
                     "</p>";
-                  html +=
-                    '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><strong>⚠️ Problem:</strong><br>';
-                  html += "1. Check your OpenAI API key<br>";
-                  html +=
-                    '2. Get a new key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></p>';
                 }
               }
-
-              // Test tts-1-hd (HD)
               if (results["tts-1-hd"]) {
                 const test = results["tts-1-hd"];
                 if (test.success) {
                   html +=
-                    '<p style="color: #28a745; margin: 8px 0;"><strong>✅ HD Quality (tts-1-hd):</strong> ' +
+                    '<p style="color: #28a745; margin: 8px 0;"><strong>✅ HD (tts-1-hd):</strong> ' +
                     test.message +
                     "</p>";
-                  html +=
-                    '<p style="color: #666; font-size: 12px; margin: 5px 0 15px 20px;"><em>💎 HD quality available!</em></p>';
                 } else {
                   html +=
-                    '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ HD Quality (tts-1-hd):</strong> ' +
+                    '<p style="color: #dc3545; margin: 8px 0;"><strong>❌ HD (tts-1-hd):</strong> ' +
                     test.error +
                     "</p>";
-                  html +=
-                    '<p style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 5px 0 15px 20px;"><strong>💡 To enable HD:</strong><br>';
-                  html +=
-                    '1. Go to <a href="https://platform.openai.com/account/billing/overview" target="_blank">OpenAI Billing</a><br>';
-                  html += "2. Add payment method and credits</p>";
                 }
               }
-
               html += "</div>";
               $results.html(html);
             }
@@ -144,7 +111,7 @@
         },
         error: function () {
           $results.html(
-            '<p style="color: #dc3545;">❌ Test failed. Please check your API key.</p>'
+            '<p style="color: #dc3545;">❌ Test failed. Check your API key.</p>'
           );
         },
         complete: function () {
@@ -161,7 +128,6 @@
     $("#aipg-hosts")
       .on("change", function () {
         const numHosts = parseInt($(this).val());
-
         $("#aipg-host-1-config").toggle(numHosts >= 1);
         $("#aipg-host-2-config").toggle(numHosts >= 2);
         $("#aipg-host-3-config").toggle(numHosts >= 3);
@@ -183,11 +149,10 @@
         .closest(".aipg-voice-select-wrapper")
         .find(".aipg-voice-select")
         .val();
-
       playVoicePreview(voice, $btn);
     });
 
-    // Update voice preview button voice when select changes
+    // Update button data when voice changes
     $(".aipg-voice-select").on("change", function () {
       const voice = $(this).val();
       $(this)
@@ -232,10 +197,14 @@
       });
     });
 
-    // Generate form submission
+    // FIXED: Generate form submission with proper voice mapping
     $("#aipg-generate-form").on("submit", function (e) {
       e.preventDefault();
 
+      const numHosts = parseInt($("#aipg-hosts").val());
+      const includeGuest = $("#aipg-include-guest").is(":checked");
+
+      // Build form data with EXACT speaker names matching what will be in the script
       const formData = {
         action: "aipg_generate_manual",
         nonce: aipgAdmin.nonce,
@@ -244,27 +213,38 @@
         language: $("#aipg-language").val(),
         podcast_style: $("#aipg-style").val(),
         tone: $("#aipg-tone").val(),
-        hosts: $("#aipg-hosts").val(),
-        include_guest: $("#aipg-include-guest").is(":checked") ? "yes" : "no",
+        hosts: numHosts,
+        include_guest: includeGuest ? "yes" : "no",
         include_emotions: $('input[name="include_emotions"]').is(":checked")
           ? "1"
           : "0",
       };
 
-      // Add host names and voices
-      const numHosts = parseInt(formData.hosts);
+      // Add host names and voices with proper indexing
       for (let i = 1; i <= numHosts; i++) {
-        formData[`host_${i}_name`] = $(`input[name="host_${i}_name"]`).val();
-        formData[`voice_host_${i}`] = $(`select[name="voice_host_${i}"]`).val();
+        const hostName =
+          $(`input[name="host_${i}_name"]`).val().trim() || `Host ${i}`;
+        const hostVoice = $(`select[name="voice_host_${i}"]`).val();
+
+        formData[`host_${i}_name`] = hostName;
+        formData[`voice_host_${i}`] = hostVoice;
+
+        console.log(`Host ${i}: Name="${hostName}", Voice="${hostVoice}"`);
       }
 
       // Add guest if included
-      if (formData.include_guest === "yes") {
-        formData.guest_name = $('input[name="guest_name"]').val();
-        formData.voice_guest = $('select[name="voice_guest"]').val();
+      if (includeGuest) {
+        const guestName =
+          $('input[name="guest_name"]').val().trim() || "Expert";
+        const guestVoice = $('select[name="voice_guest"]').val();
+
+        formData.guest_name = guestName;
+        formData.voice_guest = guestVoice;
+
+        console.log(`Guest: Name="${guestName}", Voice="${guestVoice}"`);
       }
 
-      console.log("Submitting:", formData);
+      console.log("Form data being submitted:", formData);
 
       showStatusMessage("Initiating podcast generation...", "info", true);
 
@@ -285,7 +265,6 @@
               "success"
             );
 
-            // Reset form after short delay
             setTimeout(function () {
               $("#aipg-generate-form")[0].reset();
               $("#aipg-hosts").trigger("change");
@@ -340,14 +319,14 @@
             showNotice("Error: " + response.data, "error");
             $btn
               .prop("disabled", false)
-              .html('<span class="dashicons dashicons-update"></span> Retry');
+              .html('<span class="dashicons dashicons-update"></span>');
           }
         },
         error: function () {
           showNotice("Network error occurred", "error");
           $btn
             .prop("disabled", false)
-            .html('<span class="dashicons dashicons-update"></span> Retry');
+            .html('<span class="dashicons dashicons-update"></span>');
         },
       });
     });
@@ -363,7 +342,6 @@
    * Play voice preview
    */
   function playVoicePreview(voice, $btn) {
-    // Stop current audio if playing
     if (currentAudio) {
       currentAudio.pause();
       currentAudio = null;
@@ -411,7 +389,6 @@
       },
     });
 
-    // Allow click to stop
     $btn.one("click", function (e) {
       e.preventDefault();
       if (currentAudio) {
@@ -423,7 +400,7 @@
   }
 
   /**
-   * Show status message in generate page
+   * Show status message
    */
   function showStatusMessage(message, type, loading = false) {
     const $status = $("#aipg-generation-status");
@@ -442,7 +419,7 @@
   }
 
   /**
-   * Show notice (for other pages)
+   * Show notice
    */
   function showNotice(message, type) {
     const $notice = $(
@@ -455,7 +432,6 @@
 
     $(".aipg-wrap").prepend($notice);
 
-    // Auto-dismiss after 5 seconds
     setTimeout(function () {
       $notice.fadeOut(function () {
         $(this).remove();
@@ -463,7 +439,7 @@
     }, 5000);
   }
 
-  // Add spinning animation for loading icons
+  // Add spinning animation
   $("<style>")
     .prop("type", "text/css")
     .html(
