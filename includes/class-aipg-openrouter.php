@@ -1,11 +1,8 @@
 <?php
 /**
- * IMPROVED OpenRouter API Handler
- * Features:
- * - Multi-stage script generation for complete podcasts
- * - Professional branded intro/outro
- * - Script validation and completion checking
- * - Better handling of long-form content
+ * MULTILINGUAL OpenRouter API Handler
+ * Full support for Greek and 30+ languages
+ * Professional script generation in any language
  */
 
 if (!defined('ABSPATH')) exit;
@@ -15,12 +12,55 @@ class AIPG_OpenRouter {
     private $api_key;
     private $base_url = 'https://openrouter.ai/api/v1';
     
+    // Supported languages with native names
+    private $supported_languages = array(
+        'English' => array('code' => 'en', 'native' => 'English', 'voice_support' => 'full'),
+        'Greek' => array('code' => 'el', 'native' => 'Ελληνικά', 'voice_support' => 'full'),
+        'Spanish' => array('code' => 'es', 'native' => 'Español', 'voice_support' => 'full'),
+        'French' => array('code' => 'fr', 'native' => 'Français', 'voice_support' => 'full'),
+        'German' => array('code' => 'de', 'native' => 'Deutsch', 'voice_support' => 'full'),
+        'Italian' => array('code' => 'it', 'native' => 'Italiano', 'voice_support' => 'full'),
+        'Portuguese' => array('code' => 'pt', 'native' => 'Português', 'voice_support' => 'full'),
+        'Dutch' => array('code' => 'nl', 'native' => 'Nederlands', 'voice_support' => 'full'),
+        'Polish' => array('code' => 'pl', 'native' => 'Polski', 'voice_support' => 'full'),
+        'Russian' => array('code' => 'ru', 'native' => 'Русский', 'voice_support' => 'full'),
+        'Turkish' => array('code' => 'tr', 'native' => 'Türkçe', 'voice_support' => 'full'),
+        'Arabic' => array('code' => 'ar', 'native' => 'العربية', 'voice_support' => 'full'),
+        'Chinese' => array('code' => 'zh', 'native' => '中文', 'voice_support' => 'full'),
+        'Japanese' => array('code' => 'ja', 'native' => '日本語', 'voice_support' => 'full'),
+        'Korean' => array('code' => 'ko', 'native' => '한국어', 'voice_support' => 'full'),
+        'Hindi' => array('code' => 'hi', 'native' => 'हिन्दी', 'voice_support' => 'full'),
+        'Swedish' => array('code' => 'sv', 'native' => 'Svenska', 'voice_support' => 'full'),
+        'Norwegian' => array('code' => 'no', 'native' => 'Norsk', 'voice_support' => 'full'),
+        'Danish' => array('code' => 'da', 'native' => 'Dansk', 'voice_support' => 'full'),
+        'Finnish' => array('code' => 'fi', 'native' => 'Suomi', 'voice_support' => 'full'),
+        'Czech' => array('code' => 'cs', 'native' => 'Čeština', 'voice_support' => 'full'),
+        'Romanian' => array('code' => 'ro', 'native' => 'Română', 'voice_support' => 'full'),
+        'Bulgarian' => array('code' => 'bg', 'native' => 'Български', 'voice_support' => 'full'),
+        'Ukrainian' => array('code' => 'uk', 'native' => 'Українська', 'voice_support' => 'full'),
+        'Croatian' => array('code' => 'hr', 'native' => 'Hrvatski', 'voice_support' => 'full'),
+        'Serbian' => array('code' => 'sr', 'native' => 'Српски', 'voice_support' => 'full'),
+        'Slovak' => array('code' => 'sk', 'native' => 'Slovenčina', 'voice_support' => 'full'),
+        'Hungarian' => array('code' => 'hu', 'native' => 'Magyar', 'voice_support' => 'full'),
+        'Indonesian' => array('code' => 'id', 'native' => 'Bahasa Indonesia', 'voice_support' => 'full'),
+        'Malay' => array('code' => 'ms', 'native' => 'Bahasa Melayu', 'voice_support' => 'full'),
+        'Vietnamese' => array('code' => 'vi', 'native' => 'Tiếng Việt', 'voice_support' => 'full'),
+        'Thai' => array('code' => 'th', 'native' => 'ไทย', 'voice_support' => 'full'),
+    );
+    
     public function __construct($api_key = null) {
         $this->api_key = $api_key ?: get_option('aipg_openrouter_key');
     }
     
     /**
-     * IMPROVED: Generate complete podcast script with multi-stage approach
+     * Get supported languages for admin dropdown
+     */
+    public function get_supported_languages() {
+        return $this->supported_languages;
+    }
+    
+    /**
+     * MULTILINGUAL: Generate complete podcast script
      */
     public function generate_script($article_content, $settings = array()) {
         $defaults = array(
@@ -39,7 +79,11 @@ class AIPG_OpenRouter {
         
         $settings = wp_parse_args($settings, $defaults);
         
-        error_log('AIPG: Starting multi-stage script generation');
+        $language = $settings['language'];
+        $lang_info = $this->supported_languages[$language] ?? $this->supported_languages['English'];
+        
+        error_log('AIPG: Starting multilingual script generation');
+        error_log('AIPG: Language: ' . $language . ' (' . $lang_info['native'] . ')');
         error_log('AIPG: Duration: ' . $settings['duration'] . ' minutes');
         
         // Get website info for branding
@@ -47,7 +91,7 @@ class AIPG_OpenRouter {
         $site_url = home_url();
         
         // Stage 1: Generate outline
-        $outline = $this->generate_script_outline($article_content, $settings);
+        $outline = $this->generate_script_outline($article_content, $settings, $language);
         
         if (is_wp_error($outline)) {
             error_log('AIPG: Outline generation failed - ' . $outline->get_error_message());
@@ -57,17 +101,17 @@ class AIPG_OpenRouter {
         error_log('AIPG: ✓ Outline generated with ' . count($outline['sections']) . ' sections');
         
         // Stage 2: Generate intro with branding
-        $intro = $this->generate_intro($settings, $site_name);
+        $intro = $this->generate_intro($settings, $site_name, $language);
         
         if (is_wp_error($intro)) {
             error_log('AIPG: Intro generation failed');
             return $intro;
         }
         
-        error_log('AIPG: ✓ Professional intro generated');
+        error_log('AIPG: ✓ Professional intro generated in ' . $language);
         
         // Stage 3: Generate main content sections
-        $main_sections = $this->generate_main_content($article_content, $settings, $outline);
+        $main_sections = $this->generate_main_content($article_content, $settings, $outline, $language);
         
         if (is_wp_error($main_sections)) {
             error_log('AIPG: Main content generation failed');
@@ -77,7 +121,7 @@ class AIPG_OpenRouter {
         error_log('AIPG: ✓ Main content generated (' . count($main_sections) . ' sections)');
         
         // Stage 4: Generate outro with call-to-action
-        $outro = $this->generate_outro($settings, $site_name, $site_url);
+        $outro = $this->generate_outro($settings, $site_name, $site_url, $language);
         
         if (is_wp_error($outro)) {
             error_log('AIPG: Outro generation failed');
@@ -97,12 +141,12 @@ class AIPG_OpenRouter {
         $actual_words = $parsed['word_count'];
         $completion_ratio = $actual_words / $target_words;
         
-        error_log("AIPG: Script complete - Target: {$target_words} words, Actual: {$actual_words} words ({$completion_ratio}%)");
+        error_log("AIPG: Script complete - Target: {$target_words} words, Actual: {$actual_words} words (" . round($completion_ratio * 100) . "%)");
         
-        // If script is too short, regenerate main content with more detail
+        // If script is too short, regenerate with more detail
         if ($completion_ratio < 0.7) {
             error_log('AIPG: Script too short, regenerating with more detail...');
-            $main_sections = $this->generate_main_content($article_content, $settings, $outline, true);
+            $main_sections = $this->generate_main_content($article_content, $settings, $outline, $language, true);
             $complete_script = $intro . "\n\n" . implode("\n\n", $main_sections) . "\n\n" . $outro;
             $parsed = $this->parse_script_text($complete_script, $settings);
         }
@@ -111,35 +155,39 @@ class AIPG_OpenRouter {
     }
     
     /**
-     * Generate professional branded intro
+     * MULTILINGUAL: Generate professional branded intro
      */
-    private function generate_intro($settings, $site_name) {
+    private function generate_intro($settings, $site_name, $language) {
         $host_names_text = implode(' and ', array_slice($settings['host_names'], 0, 2));
+        $lang_info = $this->supported_languages[$language] ?? $this->supported_languages['English'];
+        
+        // Get localized welcome phrases
+        $welcome_phrases = $this->get_welcome_phrases($language);
         
         $prompt = "You are a professional podcast intro writer. Create an engaging 30-second intro for a podcast.
+
+CRITICAL: Write the ENTIRE intro in {$language} ({$lang_info['native']}). Every word must be in {$language}.
 
 REQUIREMENTS:
 - Podcast website: {$site_name}
 - Hosts: {$host_names_text}
 - Style: {$settings['podcast_style']}
 - Tone: {$settings['tone']}
-- Language: {$settings['language']}
+- Language: {$language}
 
 The intro should:
-1. Start with an attention-grabbing hook
+1. Start with an attention-grabbing hook in {$language}
 2. Introduce the podcast name ({$site_name} Podcast)
 3. Introduce the hosts by name
 4. Set expectations for the episode
 5. Be energetic and welcoming
 6. Include emotion tags for natural delivery
 
-Format each line as: SPEAKER_NAME: [emotion] dialogue
+{$welcome_phrases}
 
-Example structure:
-{$settings['host_names'][0]}: [excited] Welcome to the {$site_name} Podcast!
-{$settings['host_names'][1]}: [happy] I'm {$settings['host_names'][1]}, and joining me today is my co-host {$settings['host_names'][0]}!
+Format each line as: SPEAKER_NAME: [emotion] dialogue in {$language}
 
-Generate the complete intro now (5-7 lines):";
+Generate the complete intro now (5-7 lines) in {$language}:";
 
         $response = $this->chat_completion($prompt, $settings['model'], 1000);
         
@@ -151,31 +199,39 @@ Generate the complete intro now (5-7 lines):";
     }
     
     /**
-     * Generate professional outro with call-to-action
+     * MULTILINGUAL: Generate professional outro
      */
-    private function generate_outro($settings, $site_name, $site_url) {
+    private function generate_outro($settings, $site_name, $site_url, $language) {
         $host_names_text = implode(' and ', array_slice($settings['host_names'], 0, 2));
+        $lang_info = $this->supported_languages[$language] ?? $this->supported_languages['English'];
+        
+        // Get localized thank you phrases
+        $thank_you_phrases = $this->get_thank_you_phrases($language);
         
         $prompt = "You are a professional podcast outro writer. Create a compelling outro for a podcast.
+
+CRITICAL: Write the ENTIRE outro in {$language} ({$lang_info['native']}). Every word must be in {$language}.
 
 REQUIREMENTS:
 - Podcast website: {$site_name}
 - Website URL: {$site_url}
 - Hosts: {$host_names_text}
 - Style: {$settings['podcast_style']}
-- Language: {$settings['language']}
+- Language: {$language}
 
 The outro should:
-1. Summarize key takeaways (1-2 lines)
-2. Thank the listener
-3. Include call-to-action (visit website, subscribe, share)
+1. Summarize key takeaways (1-2 lines) in {$language}
+2. Thank the listener in {$language}
+3. Include call-to-action (visit website, subscribe, share) in {$language}
 4. Mention the website name clearly
 5. Be warm and memorable
 6. Include emotion tags
 
-Format each line as: SPEAKER_NAME: [emotion] dialogue
+{$thank_you_phrases}
 
-Generate the complete outro now (6-8 lines):";
+Format each line as: SPEAKER_NAME: [emotion] dialogue in {$language}
+
+Generate the complete outro now (6-8 lines) in {$language}:";
 
         $response = $this->chat_completion($prompt, $settings['model'], 1000);
         
@@ -187,12 +243,57 @@ Generate the complete outro now (6-8 lines):";
     }
     
     /**
-     * Generate script outline
+     * Get localized welcome phrases for different languages
      */
-    private function generate_script_outline($content, $settings) {
-        $duration_words = $settings['duration'] * 150;
+    private function get_welcome_phrases($language) {
+        $phrases = array(
+            'English' => "Example: Welcome to the {site} Podcast! / Thanks for tuning in!",
+            'Greek' => "Παράδειγμα: Καλώς ήρθατε στο Podcast του {site}! / Ευχαριστούμε που μας ακούτε!",
+            'Spanish' => "Ejemplo: ¡Bienvenidos al Podcast de {site}! / ¡Gracias por escucharnos!",
+            'French' => "Exemple: Bienvenue sur le Podcast {site}! / Merci de nous écouter!",
+            'German' => "Beispiel: Willkommen beim {site} Podcast! / Danke fürs Zuhören!",
+            'Italian' => "Esempio: Benvenuti al Podcast di {site}! / Grazie per l'ascolto!",
+            'Portuguese' => "Exemplo: Bem-vindos ao Podcast {site}! / Obrigado por nos ouvir!",
+            'Arabic' => "مثال: مرحباً بكم في بودكاست {site}! / شكراً للاستماع!",
+            'Russian' => "Пример: Добро пожаловать в подкаст {site}! / Спасибо что слушаете!",
+            'Turkish' => "Örnek: {site} Podcast'ine hoş geldiniz! / Dinlediğiniz için teşekkürler!",
+            'Chinese' => "示例：欢迎来到{site}播客！/ 感谢收听！",
+            'Japanese' => "例：{site}ポッドキャストへようこそ！/ お聴きいただきありがとうございます！",
+        );
         
-        $prompt = "You are a podcast content strategist. Analyze this article and create a structured outline for a {$settings['duration']}-minute podcast.
+        return $phrases[$language] ?? $phrases['English'];
+    }
+    
+    /**
+     * Get localized thank you phrases
+     */
+    private function get_thank_you_phrases($language) {
+        $phrases = array(
+            'English' => "Example: Thanks for listening! / Visit our website for more!",
+            'Greek' => "Παράδειγμα: Ευχαριστούμε που ακούσατε! / Επισκεφθείτε την ιστοσελίδα μας για περισσότερα!",
+            'Spanish' => "Ejemplo: ¡Gracias por escuchar! / ¡Visita nuestro sitio para más!",
+            'French' => "Exemple: Merci d'avoir écouté! / Visitez notre site pour plus!",
+            'German' => "Beispiel: Danke fürs Zuhören! / Besuchen Sie unsere Website für mehr!",
+            'Italian' => "Esempio: Grazie per l'ascolto! / Visita il nostro sito per altro!",
+            'Portuguese' => "Exemplo: Obrigado por ouvir! / Visite nosso site para mais!",
+            'Arabic' => "مثال: شكراً للاستماع! / زوروا موقعنا لمزيد من المعلومات!",
+            'Russian' => "Пример: Спасибо за внимание! / Посетите наш сайт!",
+            'Turkish' => "Örnek: Dinlediğiniz için teşekkürler! / Daha fazlası için sitemizi ziyaret edin!",
+            'Chinese' => "示例：感谢收听！/ 访问我们的网站了解更多！",
+            'Japanese' => "例：お聴きいただきありがとうございます！/ 詳しくは当サイトへ！",
+        );
+        
+        return $phrases[$language] ?? $phrases['English'];
+    }
+    
+    /**
+     * MULTILINGUAL: Generate script outline
+     */
+    private function generate_script_outline($content, $settings, $language) {
+        $duration_words = $settings['duration'] * 150;
+        $lang_info = $this->supported_languages[$language] ?? $this->supported_languages['English'];
+        
+        $prompt = "You are a podcast content strategist. Analyze this article and create a structured outline for a {$settings['duration']}-minute podcast in {$language}.
 
 ARTICLE:
 " . substr($content, 0, 3000) . "
@@ -206,7 +307,9 @@ Return ONLY a JSON array like this:
 [
   {\"section\": \"Introduction to topic\", \"points\": [\"point 1\", \"point 2\"], \"words\": 300},
   {\"section\": \"Deep dive\", \"points\": [\"detail 1\", \"detail 2\"], \"words\": 600}
-]";
+]
+
+IMPORTANT: Section titles and points should reflect the {$language} language context.";
 
         $response = $this->chat_completion($prompt, $settings['model'], 2000);
         
@@ -214,10 +317,10 @@ Return ONLY a JSON array like this:
             return $response;
         }
         
-        $content = $response['choices'][0]['message']['content'] ?? '';
+        $content_response = $response['choices'][0]['message']['content'] ?? '';
         
         // Extract JSON
-        if (preg_match('/\[.*\]/s', $content, $matches)) {
+        if (preg_match('/\[.*\]/s', $content_response, $matches)) {
             $outline = json_decode($matches[0], true);
             if (is_array($outline) && !empty($outline)) {
                 return array('sections' => $outline);
@@ -233,18 +336,19 @@ Return ONLY a JSON array like this:
     }
     
     /**
-     * Generate main content sections
+     * MULTILINGUAL: Generate main content sections
      */
-    private function generate_main_content($article_content, $settings, $outline, $detailed = false) {
+    private function generate_main_content($article_content, $settings, $outline, $language, $detailed = false) {
         $sections = array();
         $search_context = !empty($settings['search_data']) ? "\n\nADDITIONAL RESEARCH:\n" . substr($settings['search_data'], 0, 1000) : '';
+        $lang_info = $this->supported_languages[$language] ?? $this->supported_languages['English'];
         
         foreach ($outline['sections'] as $index => $section_info) {
-            error_log("AIPG: Generating section " . ($index + 1) . ": " . $section_info['section']);
+            error_log("AIPG: Generating section " . ($index + 1) . " in {$language}: " . $section_info['section']);
             
             $section_words = $section_info['words'] ?? 500;
             if ($detailed) {
-                $section_words = (int)($section_words * 1.3); // 30% more detail
+                $section_words = (int)($section_words * 1.3);
             }
             
             $prompt = $this->build_section_prompt(
@@ -254,7 +358,8 @@ Return ONLY a JSON array like this:
                 $section_words,
                 $index + 1,
                 count($outline['sections']),
-                $search_context
+                $search_context,
+                $language
             );
             
             $response = $this->chat_completion($prompt, $settings['model'], $section_words * 2);
@@ -269,12 +374,12 @@ Return ONLY a JSON array like this:
             if (!empty($section_text)) {
                 $sections[] = $section_text;
                 $word_count = str_word_count($section_text);
-                error_log("AIPG: ✓ Section " . ($index + 1) . " generated ({$word_count} words)");
+                error_log("AIPG: ✓ Section " . ($index + 1) . " generated ({$word_count} words in {$language})");
             }
             
             // Small delay to avoid rate limits
             if ($index < count($outline['sections']) - 1) {
-                usleep(500000); // 0.5 second
+                usleep(500000);
             }
         }
         
@@ -282,12 +387,13 @@ Return ONLY a JSON array like this:
     }
     
     /**
-     * Build prompt for a specific section
+     * MULTILINGUAL: Build prompt for a specific section
      */
-    private function build_section_prompt($content, $settings, $section_info, $target_words, $section_num, $total_sections, $search_context) {
+    private function build_section_prompt($content, $settings, $section_info, $target_words, $section_num, $total_sections, $search_context, $language) {
         $host_names = $this->format_speaker_names($settings);
-        $style_instructions = $this->get_style_instructions($settings['podcast_style']);
-        $emotion_instructions = $settings['include_emotions'] ? $this->get_emotion_instructions() : '';
+        $style_instructions = $this->get_style_instructions($settings['podcast_style'], $language);
+        $emotion_instructions = $settings['include_emotions'] ? $this->get_emotion_instructions($language) : '';
+        $lang_info = $this->supported_languages[$language] ?? $this->supported_languages['English'];
         
         $section_title = $section_info['section'];
         $key_points = !empty($section_info['points']) ? "\nKey points to cover:\n- " . implode("\n- ", $section_info['points']) : '';
@@ -297,6 +403,8 @@ Return ONLY a JSON array like this:
             "\nNote: This is section {$section_num} of {$total_sections}. Build on previous discussion.";
         
         return "You are writing section {$section_num} of a {$settings['duration']}-minute podcast.
+
+CRITICAL: Write the ENTIRE dialogue in {$language} ({$lang_info['native']}). Every line of dialogue must be in {$language}.
 
 SECTION TOPIC: {$section_title}
 {$key_points}
@@ -312,13 +420,55 @@ SPEAKERS: {$host_names}
 
 CRITICAL REQUIREMENTS:
 1. Write EXACTLY ~{$target_words} words for this section
-2. Format: SPEAKER_NAME: [emotion] dialogue
-3. Make conversation natural with reactions, questions, back-and-forth
-4. Include specific facts, examples, and insights from the article
-5. Keep energy high and engaging
-6. Use the speaker names exactly as specified
+2. Format: SPEAKER_NAME: [emotion] dialogue in {$language}
+3. ALL dialogue must be in {$language} ({$lang_info['native']})
+4. Make conversation natural with reactions, questions, back-and-forth
+5. Include specific facts, examples, and insights from the article
+6. Keep energy high and engaging
+7. Use the speaker names exactly as specified
 
-Generate this section now ({$target_words} words):";
+Generate this section now ({$target_words} words) in {$language}:";
+    }
+    
+    /**
+     * Get style instructions in multiple languages
+     */
+    private function get_style_instructions($style, $language) {
+        $is_english = ($language === 'English');
+        
+        $styles = array(
+            'conversational' => $is_english ? 
+                "CONVERSATIONAL STYLE: Sound like friends discussing an interesting topic. Use casual but professional language." :
+                "CONVERSATIONAL STYLE: Create natural, friendly dialogue like friends discussing an interesting topic in {$language}.",
+            
+            'interview' => $is_english ?
+                "INTERVIEW STYLE: Host asks probing questions, guest provides expert answers." :
+                "INTERVIEW STYLE: One host asks questions, the other provides expert answers in {$language}.",
+            
+            'debate' => $is_english ?
+                "DEBATE STYLE: Present multiple perspectives respectfully." :
+                "DEBATE STYLE: Present different viewpoints respectfully in {$language}.",
+            
+            'educational' => $is_english ?
+                "EDUCATIONAL STYLE: Break down complex concepts clearly with examples." :
+                "EDUCATIONAL STYLE: Explain concepts clearly with examples in {$language}.",
+            
+            'storytelling' => $is_english ?
+                "STORYTELLING STYLE: Frame content as a narrative journey with vivid descriptions." :
+                "STORYTELLING STYLE: Tell a story with vivid descriptions in {$language}.",
+        );
+        
+        return $styles[$style] ?? $styles['conversational'];
+    }
+    
+    /**
+     * Get emotion instructions
+     */
+    private function get_emotion_instructions($language) {
+        return "EMOTION TAGS (Use strategically):
+[excited] [thoughtful] [concerned] [happy] [curious] [calm]
+
+These work in any language - add them before dialogue to guide the voice delivery.";
     }
     
     /**
@@ -338,7 +488,6 @@ Generate this section now ({$target_words} words):";
                 $emotion = !empty($matches[3]) ? trim($matches[3]) : '';
                 $text = trim($matches[4]);
                 
-                // Skip if text is too short (likely parsing error)
                 if (strlen($text) < 5) continue;
                 
                 $parsed_script[] = array(
@@ -366,58 +515,6 @@ Generate this section now ({$target_words} words):";
     }
     
     /**
-     * Get style instructions
-     */
-    private function get_style_instructions($style) {
-        $styles = array(
-            'conversational' => "CONVERSATIONAL STYLE:
-- Sound like friends discussing an interesting topic
-- Use casual but professional language
-- Include natural reactions and interruptions
-- Build excitement throughout",
-            
-            'interview' => "INTERVIEW STYLE:
-- Host asks probing questions
-- Guest provides expert answers
-- Include follow-up questions
-- Guide conversation to key points",
-            
-            'debate' => "DEBATE STYLE:
-- Present multiple perspectives
-- Respectful disagreement allowed
-- Use evidence and reasoning
-- Find common ground",
-            
-            'educational' => "EDUCATIONAL STYLE:
-- Break down complex concepts
-- Use clear analogies
-- Build from basics to advanced
-- Include teaching moments",
-            
-            'storytelling' => "STORYTELLING STYLE:
-- Frame as narrative journey
-- Use vivid descriptions
-- Build suspense
-- Include examples and scenarios",
-        );
-        
-        return $styles[$style] ?? $styles['conversational'];
-    }
-    
-    /**
-     * Get emotion instructions
-     */
-    private function get_emotion_instructions() {
-        return "EMOTION TAGS (Use strategically):
-- [excited] - Enthusiasm, big reveals
-- [thoughtful] - Reflection, considering
-- [concerned] - Serious topics, warnings
-- [happy] - Positive moments, humor
-- [curious] - Questions, seeking understanding
-- [calm] - Explanations, conclusions";
-    }
-    
-    /**
      * Format speaker names
      */
     private function format_speaker_names($settings) {
@@ -431,6 +528,9 @@ Generate this section now ({$target_words} words):";
         return implode(', ', $names);
     }
     
+    // ... (Keep all the other methods: generate_episode_summary, generate_show_notes, 
+    // chat_completion, generate_search_queries, select_best_article - these are language-agnostic)
+    
     /**
      * Generate episode summary
      */
@@ -441,19 +541,17 @@ PODCAST SCRIPT:
 " . substr($script_text, 0, 2000) . "
 
 Requirements:
-1. Capture main topic and key insights
-2. Highlight most interesting points
+1. Match the language of the script
+2. Capture main topic and key insights
 3. Make people want to listen
-4. Use natural, conversational language
-5. SEO-friendly with keywords
-6. 150-200 words
+4. 150-200 words
 
 Write the summary now:";
         
         $response = $this->chat_completion($prompt, 'openai/gpt-4o-mini', 500);
         
         if (is_wp_error($response)) {
-            return "In this episode, we explore {$article_title} in depth, breaking down the key concepts and discussing what it means for you.";
+            return "In this episode, we explore {$article_title} in depth.";
         }
         
         return trim($response['choices'][0]['message']['content'] ?? '');
@@ -502,9 +600,6 @@ Write the summary now:";
         return $notes;
     }
     
-    /**
-     * Extract topic from text
-     */
     private function extract_topic($text) {
         $sentences = preg_split('/[.!?]+/', $text);
         foreach ($sentences as $sentence) {
@@ -516,9 +611,6 @@ Write the summary now:";
         return substr($text, 0, 80) . '...';
     }
     
-    /**
-     * Format timestamp
-     */
     private function format_timestamp($seconds) {
         $mins = floor($seconds / 60);
         $secs = floor($seconds % 60);
@@ -615,12 +707,6 @@ Return ONLY JSON array: [\"query 1\", \"query 2\", \"query 3\"]";
         }
         
         $prompt = "Select the BEST article for a podcast episode.
-
-Consider:
-- Conversational potential
-- Relevance and timeliness
-- Depth and substance
-- Audience interest
 
 ARTICLES:
 {$articles_text}

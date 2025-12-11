@@ -22,6 +22,53 @@ class AIPG_Admin {
         add_action('admin_init', array($this, 'register_settings'));
         add_action('wp_ajax_aipg_test_tts_access', array($this, 'ajax_test_tts_access'));
     }
+
+    /**
+     * Get available languages for dropdown
+     */
+    public function get_available_languages() {
+        return array(
+            // European Languages
+            'English' => array('label' => 'English', 'flag' => '🇬🇧', 'tts_support' => true),
+            'Greek' => array('label' => 'Ελληνικά (Greek)', 'flag' => '🇬🇷', 'tts_support' => true),
+            'Spanish' => array('label' => 'Español (Spanish)', 'flag' => '🇪🇸', 'tts_support' => true),
+            'French' => array('label' => 'Français (French)', 'flag' => '🇫🇷', 'tts_support' => true),
+            'German' => array('label' => 'Deutsch (German)', 'flag' => '🇩🇪', 'tts_support' => true),
+            'Italian' => array('label' => 'Italiano (Italian)', 'flag' => '🇮🇹', 'tts_support' => true),
+            'Portuguese' => array('label' => 'Português (Portuguese)', 'flag' => '🇵🇹', 'tts_support' => true),
+            'Dutch' => array('label' => 'Nederlands (Dutch)', 'flag' => '🇳🇱', 'tts_support' => true),
+            'Polish' => array('label' => 'Polski (Polish)', 'flag' => '🇵🇱', 'tts_support' => true),
+            'Russian' => array('label' => 'Русский (Russian)', 'flag' => '🇷🇺', 'tts_support' => true),
+            'Turkish' => array('label' => 'Türkçe (Turkish)', 'flag' => '🇹🇷', 'tts_support' => true),
+            'Swedish' => array('label' => 'Svenska (Swedish)', 'flag' => '🇸🇪', 'tts_support' => true),
+            'Norwegian' => array('label' => 'Norsk (Norwegian)', 'flag' => '🇳🇴', 'tts_support' => true),
+            'Danish' => array('label' => 'Dansk (Danish)', 'flag' => '🇩🇰', 'tts_support' => true),
+            'Finnish' => array('label' => 'Suomi (Finnish)', 'flag' => '🇫🇮', 'tts_support' => true),
+            'Czech' => array('label' => 'Čeština (Czech)', 'flag' => '🇨🇿', 'tts_support' => true),
+            'Romanian' => array('label' => 'Română (Romanian)', 'flag' => '🇷🇴', 'tts_support' => true),
+            'Bulgarian' => array('label' => 'Български (Bulgarian)', 'flag' => '🇧🇬', 'tts_support' => true),
+            'Ukrainian' => array('label' => 'Українська (Ukrainian)', 'flag' => '🇺🇦', 'tts_support' => true),
+            'Croatian' => array('label' => 'Hrvatski (Croatian)', 'flag' => '🇭🇷', 'tts_support' => true),
+            'Serbian' => array('label' => 'Српски (Serbian)', 'flag' => '🇷🇸', 'tts_support' => true),
+            'Slovak' => array('label' => 'Slovenčina (Slovak)', 'flag' => '🇸🇰', 'tts_support' => true),
+            'Hungarian' => array('label' => 'Magyar (Hungarian)', 'flag' => '🇭🇺', 'tts_support' => true),
+            
+            // Middle Eastern Languages
+            'Arabic' => array('label' => 'العربية (Arabic)', 'flag' => '🇸🇦', 'tts_support' => true),
+            'Hebrew' => array('label' => 'עברית (Hebrew)', 'flag' => '🇮🇱', 'tts_support' => true),
+            'Persian' => array('label' => 'فارسی (Persian)', 'flag' => '🇮🇷', 'tts_support' => true),
+            
+            // Asian Languages
+            'Chinese' => array('label' => '中文 (Chinese)', 'flag' => '🇨🇳', 'tts_support' => true),
+            'Japanese' => array('label' => '日本語 (Japanese)', 'flag' => '🇯🇵', 'tts_support' => true),
+            'Korean' => array('label' => '한국어 (Korean)', 'flag' => '🇰🇷', 'tts_support' => true),
+            'Hindi' => array('label' => 'हिन्दी (Hindi)', 'flag' => '🇮🇳', 'tts_support' => true),
+            'Indonesian' => array('label' => 'Bahasa Indonesia', 'flag' => '🇮🇩', 'tts_support' => true),
+            'Malay' => array('label' => 'Bahasa Melayu (Malay)', 'flag' => '🇲🇾', 'tts_support' => true),
+            'Vietnamese' => array('label' => 'Tiếng Việt (Vietnamese)', 'flag' => '🇻🇳', 'tts_support' => true),
+            'Thai' => array('label' => 'ไทย (Thai)', 'flag' => '🇹🇭', 'tts_support' => true),
+        );
+    }
     
     /**
      * Add admin menu
@@ -481,13 +528,19 @@ class AIPG_Admin {
                                 <div class="aipg-form-row">
                                     <label><?php _e('Language', 'ai-podcast-gen'); ?></label>
                                     <select name="language" id="aipg-language" class="aipg-select">
-                                        <option value="English">English</option>
-                                        <option value="Spanish">Español</option>
-                                        <option value="French">Français</option>
-                                        <option value="German">Deutsch</option>
-                                        <option value="Italian">Italiano</option>
-                                        <option value="Portuguese">Português</option>
+                                        <?php 
+                                        $languages = $this->get_available_languages();
+                                        foreach ($languages as $code => $lang_info): 
+                                        ?>
+                                            <option value="<?php echo esc_attr($code); ?>" 
+                                                    data-tts-support="<?php echo $lang_info['tts_support'] ? 'true' : 'false'; ?>">
+                                                <?php echo esc_html($lang_info['flag'] . ' ' . $lang_info['label']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
+                                    <p class="aipg-form-help">
+                                        <?php _e('Select the podcast language. All supported languages work with TTS.', 'ai-podcast-gen'); ?>
+                                    </p>
                                 </div>
                                 
                                 <div class="aipg-form-row">
